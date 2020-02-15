@@ -164,7 +164,7 @@ instance EvalJS (Doc Py) where
 
     var (Unbox n) = just "var" <> align_tupled [just n]
     var This      = just "this"
-    var Import    = just "var('load_module')"
+    var Import    = just "var('import_module')"
     assign (Unbox n) v = just "assign" <> align_tupled [just n, v]
     while cond body    = just "loop"   <> align_tupled [cond, body]
     upRecord old new   = just "lens"   <> align_tupled [old, new]
@@ -179,3 +179,6 @@ instance EvalJS (Doc Py) where
     comment cs exp = just "document" <> align_tupled [vsep (map just cs), exp]
     located SourceLoc {line, col, filename} term =
         just "metadata" <> align_tupled [pretty line, pretty col, just $ escape filename, term]
+
+bindSExpr :: String -> Doc Py -> Doc Py
+bindSExpr name sexpr = just name <+> just "=" <+> sexpr

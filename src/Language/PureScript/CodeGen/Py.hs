@@ -53,7 +53,7 @@ import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
                                    errorMessage', rethrowWithPosition, addHint)
 import Language.PureScript.Names hiding (runModuleName)
 import Language.PureScript.Options
-import Language.PureScript.PSString (PSString, mkString)
+import Language.PureScript.PSString (PSString, mkString, decodeStringWithReplacement)
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
@@ -78,8 +78,8 @@ moduleToJS
    . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
   -> Maybe AST
-  -> m [AST]
-moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
+  -> m (Bool, AST)
+moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -97,15 +97,13 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
                     mk . mkString . unComments $ coms
                | otherwise = mk "No document"
                where mk =  AST.StringLiteral Nothing
-    let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
+    let foreignImport = AST.App Nothing (AST.Var Nothing $ unmangle "import") 
+                        [AST.StringLiteral Nothing ".foreign", AST.Var Nothing $ unmangle "__package__"]
+    let hasForeign = not $ null foreigns
+    let foreign' = [foreignImport | hasForeign]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
-    let foreignExps = exps `intersect` foreigns
-    let standardExps = exps \\ foreignExps
-    let exps' = AST.ArrayLiteral Nothing $
-                    map (AST.StringLiteral Nothing . mkString . runIdent) standardExps ++
-                    map (AST.StringLiteral Nothing . mkString . runIdent) foreignExps
-    return $ AST.Block Nothing $ moduleBody ++ [AST.Assignment Nothing (AST.Var Nothing $ unmangle "__all__") exps']
-
+    return (hasForeign, AST.Block Nothing moduleBody)
+  
   where
 
   -- | Extracts all declaration names from a binding group.
@@ -140,7 +138,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
     let moduleBody = AST.App Nothing (AST.Var Nothing $ unmangle "import")
-          [AST.StringLiteral Nothing (fromString (".." ++ T.unpack (runModuleName mn')))]
+          [AST.StringLiteral Nothing (fromString (".." ++ T.unpack (runModuleName mn'))), AST.Var Nothing $ unmangle "__package__"]
     withPos ss $ AST.VariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to

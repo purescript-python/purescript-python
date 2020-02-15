@@ -11,6 +11,8 @@ import Data.Aeson hiding (Options)
 import Data.Aeson.Types hiding (Options)
 
 import Data.Text (Text, pack, unpack)
+
+import qualified Data.List as List
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
@@ -29,8 +31,9 @@ import Language.PureScript.Options (Options(..))
 
 
 import Language.PureScript.CodeGen.Py (moduleToJS)
-import Language.PureScript.CodeGen.Py.Printer (Py)
+import Language.PureScript.CodeGen.Py.Printer (Py, bindSExpr)
 import Language.PureScript.CodeGen.Py.Eval (finally)
+import Language.PureScript.CodeGen.Py.Common (escape)
 
 import Control.Monad.Supply
 import Control.Monad.Supply.Class
@@ -38,6 +41,7 @@ import Control.Monad.Supply.Class
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 import Data.Text.Prettyprint.Doc (Doc, layoutPretty, defaultLayoutOptions)
 
+import Control.Monad (when)
 import Control.Monad.Reader (MonadReader(..))
 import qualified Control.Monad.State as State
 
@@ -57,32 +61,37 @@ main :: IO ()
 main = do
     opts <- getArgs
     case opts of
-        ["--top-of-out", baseOutDir, "--corefn", jsonFile] ->
-            cg baseOutDir jsonFile
-        _ ->  putStrLn "Malformed options, expect form --top-of-out <dir1> --corefn <xxx.json>." >> exitFailure
+        ["--foreign-top", foreignBaseDir, "--out-top", baseOutDir, "--corefn", jsonFile] ->
+            cg foreignBaseDir baseOutDir jsonFile
+        _ ->  putStrLn "Malformed options, expect form --foreign-top <dir0> --out-top <dir1> --corefn <xxx.json>." >> exitFailure
 
-cg :: FilePath -> FilePath -> IO ()
-cg baseOutDir jsonFile = do
+cg :: FilePath -> FilePath -> FilePath -> IO ()
+cg foreignBaseDir baseOutDir jsonFile = do
   jsonText <- T.decodeUtf8 <$> B.readFile jsonFile
   let module' = jsonToModule $ parseJson jsonText
 
   case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
         moduleToJS module' Nothing of
       Left e -> putStrLn (show (e :: MultipleErrors)) >> exitFailure
-      Right ((ast, _), _) -> do
+      Right (((hasForeign, ast), _), _) -> do
         let
-            implementation = doc2Text (finally ast :: Doc Py)
-            outDir = runToModulePath baseOutDir $ moduleName module'
-            implPath = outDir </> "impl.py"
+            implCode = legalizedCodeGen (finally ast)
+            mn     = moduleName module'
+            outDir = runToModulePath baseOutDir mn
+            ffiDir = runToModulePath foreignBaseDir mn
+            entryPath = outDir </> "__init__.py"
+            implSrcPath = outDir </> "impl.src.py"
+            implCachePath = outDir </> "impl.py"
+            foreignSrcPath = ffiDir <> ".py"
+            foreignDestPath = outDir </> "foreign.py"
+
         createDirectoryIfMissing True outDir
-        T.writeFile implPath implementation
-
-
-doc2Text :: Doc ann -> T.Text
-doc2Text = renderStrict . layoutPretty defaultLayoutOptions
-
-interfaceFileName :: String -> FilePath
-interfaceFileName mn = mn <> ".py"
+        T.writeFile entryPath entry
+        T.writeFile implSrcPath implCode
+        T.writeFile implCachePath loaderCode
+        when hasForeign $ do
+            foreignCode <- T.readFile foreignSrcPath
+            T.writeFile foreignDestPath foreignCode
 
 runToModulePath :: FilePath -> P.ModuleName -> String
 runToModulePath base (P.ModuleName pns) =
@@ -99,3 +108,38 @@ jsonToModule value =
     Success (_, r) -> r
     _ -> error "Bad corefn"
 
+
+
+doc2Text :: Doc ann -> T.Text
+doc2Text = renderStrict . layoutPretty defaultLayoutOptions
+
+legalizedCodeGen :: Doc Py -> Text
+legalizedCodeGen sexpr =
+    T.unlines
+      [
+        T.pack "from py_sexpr.terms import *"
+      , T.pack "from py_sexpr.stack_vm.emit import module_code"
+      , doc2Text (bindSExpr "res" sexpr)
+      , T.pack "res = module_code(res)"
+      ]
+
+loaderCode :: Text
+loaderCode =
+    T.unlines . map T.pack $
+      [
+        "from purescript_python_loader import LoadIt"
+      , "__py__ = globals()"
+      , "purescript_module = LoadIt(__name__, __file__)"
+      ]
+
+
+entry :: Text
+entry =
+    T.unlines . map T.pack $
+      [
+        "from . import impl"
+      , "__py__ = globals()"
+      , "__ps__ = impl.purescript_module"
+      , "__all__ = __ps__.__all__"
+      , "__py__.update({attr: __ps__[attr] for attr in __all__})"
+      ]      

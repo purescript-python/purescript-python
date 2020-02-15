@@ -1,0 +1,474 @@
+-- | This is a modification based on Language.PureScript.CodeGen.JS,
+-- hence we preserve the license under PROJECT_ROOT/licenses/direct-from-purescript.
+-- | This module generates code in the core imperative representation from
+-- elaborated PureScript code.
+{-# LANGUAGE
+      NoImplicitPrelude
+    , OverloadedStrings
+#-}
+-- | This module generates code in the core imperative representation from
+-- elaborated PureScript code.
+module Language.PureScript.CodeGen.Py
+  ( module AST
+  , module Common
+  , moduleToJS
+  ) where
+
+import Prelude.Compat
+import Protolude (ordNub)
+import Language.PureScript.Comments (Comment(..))
+import Control.Arrow ((&&&))
+import Control.Monad (forM, replicateM, void)
+import Control.Monad.Except (MonadError, throwError)
+import Control.Monad.Reader (MonadReader, asks)
+import Control.Monad.Supply.Class
+
+import Data.List ((\\), intersect)
+import qualified Data.Foldable as F
+import qualified Data.Map as M
+import qualified Data.Set as S
+import Data.Maybe (fromMaybe, isNothing)
+import Data.String (fromString)
+import Data.Text (Text)
+import qualified Data.Text as T
+
+import qualified Language.PureScript as P
+import qualified Language.PureScript.Hierarchy as P
+
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.CodeGen.JS.Common as Common
+import Language.PureScript.CoreImp.AST (AST, everywhereTopDownM, withSourceSpan)
+import qualified Language.PureScript.CoreImp.AST as AST
+import Language.PureScript.CoreImp.Optimizer
+import Language.PureScript.CoreFn
+import Language.PureScript.Crash
+import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
+                                   MultipleErrors(..), rethrow, errorMessage,
+                                   errorMessage', rethrowWithPosition, addHint)
+import Language.PureScript.Names hiding (runModuleName)
+import Language.PureScript.Options
+import Language.PureScript.PSString (PSString, mkString)
+import Language.PureScript.Traversals (sndM)
+import qualified Language.PureScript.Constants as C
+
+import System.FilePath.Posix ((</>))
+import Language.PureScript.CodeGen.Py.Common (unmangle)
+
+
+runModuleName :: P.ModuleName -> Text
+runModuleName (P.ModuleName pns) = T.intercalate "." (P.runProperName <$> pns)
+
+unComments :: [Comment] -> Text
+unComments [] = T.empty
+unComments (x:xs) = T.append hd tl
+    where hd | LineComment x <- x = x
+             | BlockComment x <- x = x
+          tl = unComments xs
+
+-- | Generate code in the simplified Python intermediate representation for all declarations in a
+-- module.
+moduleToJS
+  :: forall m
+   . (Monad m, MonadSupply m, MonadError MultipleErrors m)
+  => Module Ann
+  -> Maybe AST
+  -> m [AST]
+moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
+  rethrow (addHint (ErrorInModule mn)) $ do
+    let usedNames = concatMap getNames decls
+    let mnLookup = renameImports usedNames imps
+    decls <- return $ renameModules mnLookup decls
+    jsDecls <- mapM bindToJs decls
+    optimized <- traverse (traverse optimize) jsDecls
+    let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
+    let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+    jsImports <- traverse (importToJs mnLookup)
+      . filter (flip S.member usedModuleNames)
+      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
+    F.traverse_ (F.traverse_ checkIntegers) optimized
+    -- comments <- not <$> asks optionsNoComments
+    let header | not (null coms) -- && comments
+                  = mk . mkString . unComments $ coms
+               | otherwise = mk "No document"        
+               where mk =  AST.StringLiteral Nothing
+    let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
+    let moduleBody = header : foreign' ++ jsImports ++ concat optimized
+    let foreignExps = exps `intersect` foreigns
+    let standardExps = exps \\ foreignExps
+    let exps' = AST.ArrayLiteral Nothing $
+                    map (AST.StringLiteral Nothing . mkString . runIdent) standardExps ++
+                    map (AST.StringLiteral Nothing . mkString . runIdent) foreignExps
+    return $ moduleBody ++ [AST.Assignment Nothing (AST.Var Nothing $ unmangle "__all__") exps']
+
+  where
+
+  -- | Extracts all declaration names from a binding group.
+  getNames :: Bind Ann -> [Ident]
+  getNames (NonRec _ ident _) = [ident]
+  getNames (Rec vals) = map (snd . fst) vals
+
+  -- | Creates alternative names for each module to ensure they don't collide
+  -- with declaration names.
+  renameImports :: [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
+  renameImports = go M.empty
+    where
+    go :: M.Map ModuleName (Ann, ModuleName) -> [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
+    go acc used ((ann, mn') : mns') =
+      let mni = Ident $ runModuleName mn'
+      in if mn' /= mn && mni `elem` used
+         then let newName = freshModuleName 1 mn' used
+              in go (M.insert mn' (ann, newName) acc) (Ident (runModuleName newName) : used) mns'
+         else go (M.insert mn' (ann, mn') acc) used mns'
+    go acc _ [] = acc
+
+    freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
+    freshModuleName i mn'@(ModuleName pns) used =
+      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "." <> T.pack (show i)]
+      in if Ident (runModuleName newName) `elem` used
+         then freshModuleName (i + 1) mn' used
+         else newName
+
+  -- | Generates Jsthon code for a module import, binding the required module
+  -- to the alternative
+  importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m AST
+  importToJs mnLookup mn' = do
+    let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
+    let moduleBody = AST.App Nothing (AST.Var Nothing $ unmangle "import")
+          [AST.StringLiteral Nothing (fromString (".." ++ T.unpack (runModuleName mn')))]
+    withPos ss $ AST.VariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
+
+  -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
+  -- the collision-avoiding renamed module imports.
+  renameModules :: M.Map ModuleName (Ann, ModuleName) -> [Bind Ann] -> [Bind Ann]
+  renameModules mnLookup binds =
+    let (f, _, _) = everywhereOnValues id goExpr goBinder
+    in map f binds
+    where
+    goExpr :: Expr a -> Expr a
+    goExpr (Var ann q) = Var ann (renameQual q)
+    goExpr e = e
+    goBinder :: Binder a -> Binder a
+    goBinder (ConstructorBinder ann q1 q2 bs) = ConstructorBinder ann (renameQual q1) (renameQual q2) bs
+    goBinder b = b
+    renameQual :: Qualified a -> Qualified a
+    renameQual (Qualified (Just mn') a) =
+      let (_,mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
+      in Qualified (Just mnSafe) a
+    renameQual q = q
+
+  -- |
+  -- Find the set of ModuleNames referenced by an AST.
+  --
+  findModules :: M.Map Text ModuleName -> AST -> S.Set ModuleName
+  findModules mnReverseLookup = AST.everything mappend go
+    where
+    go (AST.Var _ name) = foldMap S.singleton $ M.lookup name mnReverseLookup
+    go _ = mempty
+
+  -- |
+  -- Generate code in the simplified JavaScript intermediate representation for a declaration
+  --
+  bindToJs :: Bind Ann -> m [AST]
+  bindToJs (NonRec ann ident val) = return <$> nonRecToJS ann ident val
+  bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToJS)
+
+  -- | Generate code in the simplified JavaScript intermediate representation for a single non-recursive
+  -- declaration.
+  --
+  -- The main purpose of this function is to handle code generation for comments.
+  nonRecToJS :: Ann -> Ident -> Expr Ann -> m AST
+  nonRecToJS a i e@(extractAnn -> (_, com, _, _)) | not (null com) = do
+    -- withoutComment <- asks optionsNoComments
+    -- if withoutComment
+    --    then nonRecToJS a i (modifyAnn removeComments e)
+      --  else
+          AST.Comment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
+  nonRecToJS (ss, _, _, _) ident val = do
+    js <- valueToJs val
+    withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)
+
+  withPos :: SourceSpan -> AST -> m AST
+  withPos ss js = return $ -- do
+    -- withSM <- asks (elem JSSourceMap . optionsCodegenTargets)
+    -- return $ if withSM
+      -- then 
+        withSourceSpan ss js
+      -- else js
+
+  -- | Generate code in the simplified JavaScript intermediate representation for a variable based on a
+  -- PureScript identifier.
+  var :: Ident -> AST
+  var = AST.Var Nothing . identToJs
+
+  -- | Generate code in the simplified JavaScript intermediate representation for an accessor based on
+  -- a PureScript identifier. If the name is not valid in JavaScript (symbol based, reserved name) an
+  -- indexer is returned.
+  accessor :: Ident -> AST -> AST
+  accessor (Ident prop) = indexerString $ mkString prop
+  accessor (GenIdent _ _) = internalError "GenIdent in accessor"
+  accessor UnusedIdent = internalError "UnusedIdent in accessor"
+
+
+  -- | As `a[["attr"]]` is impossible, we use `a[["attr"]]` to represent `a.attr`,
+  -- to avoid the mixture of indexing and accessing in JavaScript.
+  indexerString :: PSString -> AST -> AST
+  indexerString prop = AST.Indexer Nothing (AST.ArrayLiteral Nothing [AST.StringLiteral Nothing prop])
+  
+
+  accessorString :: PSString -> AST -> AST
+  accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
+  
+
+  -- | Generate code in the simplified JavaScript intermediate representation for a value or expression.
+  valueToJs :: Expr Ann -> m AST
+  valueToJs e =
+    let (ss, _, _, _) = extractAnn e in
+    withPos ss =<< valueToJs' e
+
+  valueToJs' :: Expr Ann -> m AST
+  valueToJs' (Literal (pos, _, _, _) l) =
+    rethrowWithPosition pos $ literalToValueJS pos l
+  valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
+    return $ accessorString "value" $ qualifiedToJS id name
+  valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
+    return $ qualifiedToJS id name
+  valueToJs' (Accessor _ prop val) =
+    indexerString prop <$> valueToJs val
+  valueToJs' (ObjectUpdate _ o ps) = do
+    obj <- valueToJs o
+    sts <- mapM (sndM valueToJs) ps
+    extendObj obj sts
+  valueToJs' e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
+    let args = unAbs e
+    in return $ AST.Function Nothing Nothing (map identToJs args) (AST.Block Nothing $ map assign args)
+    where
+    unAbs :: Expr Ann -> [Ident]
+    unAbs (Abs _ arg val) = arg : unAbs val
+    unAbs _ = []
+    assign :: Ident -> AST
+    assign name = AST.Assignment Nothing (indexerString (mkString $ runIdent name) this)
+                               (var name)
+  valueToJs' (Abs _ arg val) = do
+    ret <- valueToJs val
+    let jsArg = case arg of
+                  UnusedIdent -> []
+                  _           -> [identToJs arg]
+    return $ AST.Function Nothing Nothing jsArg (AST.Block Nothing [AST.Return Nothing ret])
+  valueToJs' e@App{} = do
+    let (f, args) = unApp e []
+    args' <- mapM valueToJs args
+    case f of
+      Var (_, _, _, Just IsNewtype) _ -> return (head args')
+      Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
+        return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
+      Var (_, _, _, Just IsTypeClassConstructor) name ->
+        return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
+      _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
+    where
+    unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
+    unApp (App _ val arg) args = unApp val (arg : args)
+    unApp other args = (other, args)
+  valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
+    return $ if mn' == mn
+             then foreignIdent ident
+             else varToJs qi
+  valueToJs' (Var (_, _, _, Just IsForeign) ident) =
+    internalError $ "Encountered an unqualified reference to a foreign ident " ++ T.unpack (showQualified showIdent ident)
+  valueToJs' (Var _ ident) = return $ varToJs ident
+  valueToJs' (Case (ss, _, _, _) values binders) = do
+    vals <- mapM valueToJs values
+    bindersToJs ss binders vals
+  valueToJs' (Let _ ds val) = do
+    ds' <- concat <$> mapM bindToJs ds
+    ret <- valueToJs val
+    return $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing (ds' ++ [AST.Return Nothing ret]))) []
+  valueToJs' (Constructor (_, _, _, Just IsNewtype) _ ctor _) =
+    return $ AST.VariableIntroduction Nothing (properToJs ctor) (Just $
+                  AST.Function Nothing Nothing ["value"]
+                    (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"]))
+
+  valueToJs' (Constructor _ _ ctor []) =
+    return $ AST.Block Nothing
+           [ AST.Function Nothing (Just (properToJs ctor)) [] (AST.Block Nothing [this])
+           , AST.Assignment Nothing (accessorString "value" (AST.Var Nothing (properToJs ctor)))
+             $ AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) []
+           ]
+           
+  valueToJs' (Constructor _ _ ctor fields) =
+    let constructor =
+          let body = [ AST.Assignment Nothing ((indexerString $ mkString $ identToJs f) this) (var f) | f <- fields ]
+          in AST.Function Nothing (Just (properToJs ctor)) (identToJs `map` fields) (AST.Block Nothing $ body ++ [AST.Return Nothing this])
+    in return constructor
+  
+  this = AST.Var Nothing $ unmangle "this"
+
+  literalToValueJS :: SourceSpan -> Literal (Expr Ann) -> m AST
+  literalToValueJS ss (NumericLiteral (Left i)) = return $ AST.NumericLiteral (Just ss) (Left i)
+  literalToValueJS ss (NumericLiteral (Right n)) = return $ AST.NumericLiteral (Just ss) (Right n)
+  literalToValueJS ss (StringLiteral s) = return $ AST.StringLiteral (Just ss) s
+  literalToValueJS ss (CharLiteral c) = return $ AST.StringLiteral (Just ss) (fromString [c])
+  literalToValueJS ss (BooleanLiteral b) = return $ AST.BooleanLiteral (Just ss) b
+  literalToValueJS ss (ArrayLiteral xs) = AST.ArrayLiteral (Just ss) <$> mapM valueToJs xs
+  literalToValueJS ss (ObjectLiteral ps) = AST.ObjectLiteral (Just ss) <$> mapM (sndM valueToJs) ps
+
+  -- | Shallow copy an object.
+  extendObj :: AST -> [(PSString, AST)] -> m AST
+  extendObj obj sts = do
+    newObj <- freshName
+    key <- freshName
+    evaluatedObj <- freshName
+    let
+      -- We shall implement `update` in RTS,
+      -- update(a, b) = {**a, **b}.
+      -- Also we should inline it if possible, to avoid function calls.
+      jsNewObj = AST.ObjectLiteral Nothing sts
+    return $ AST.App Nothing (accessorString "special@record_update" obj) [jsNewObj]
+    
+  -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
+  -- variable.
+  varToJs :: Qualified Ident -> AST
+  varToJs (Qualified Nothing ident) = var ident
+  varToJs qual = qualifiedToJS id qual
+
+  -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
+  -- variable that may have a qualified name.
+  qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
+  qualifiedToJS f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = AST.Var Nothing . runIdent $ f a
+  qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
+  qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
+
+  foreignIdent :: Ident -> AST
+  foreignIdent ident = accessorString (mkString $ runIdent ident) (AST.Var Nothing "$foreign")
+
+  -- | Generate code in the simplified JavaScript intermediate representation for pattern match binders
+  -- and guards.
+  bindersToJs :: SourceSpan -> [CaseAlternative Ann] -> [AST] -> m AST
+  bindersToJs ss binders vals = do
+    valNames <- replicateM (length vals) freshName
+    let assignments = zipWith (AST.VariableIntroduction Nothing) valNames (map Just vals)
+    jss <- forM binders $ \(CaseAlternative bs result) -> do
+      ret <- guardsToJs result
+      go valNames ret bs
+    return $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing (assignments ++ concat jss ++ [AST.Throw Nothing $ failedPatternError valNames])))
+                   []
+    where
+      go :: [Text] -> [AST] -> [Binder Ann] -> m [AST]
+      go _ done [] = return done
+      go (v:vs) done' (b:bs) = do
+        done'' <- go vs done' bs
+        binderToJs v done'' b
+      go _ _ _ = internalError "Invalid arguments to bindersToJs"
+
+      failedPatternError :: [Text] -> AST
+      failedPatternError names = AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing "Error") [AST.Binary Nothing AST.Add (AST.StringLiteral Nothing $ mkString failedPatternMessage) (AST.ArrayLiteral Nothing $ zipWith valueError names vals)]
+
+      failedPatternMessage :: Text
+      failedPatternMessage = "Failed pattern match at " <> runModuleName mn <> " " <> displayStartEndPos ss <> ": "
+
+      valueError :: Text -> AST -> AST
+      valueError _ l@(AST.NumericLiteral _ _) = l
+      valueError _ l@(AST.StringLiteral _ _)  = l
+      valueError _ l@(AST.BooleanLiteral _ _) = l
+      -- Newing an object produces such a Python programs
+      --  `new A(b, c) -> tmp = {".t" : A}; A(b, c, this=tmp); return tmp
+      valueError s _                          = accessorString "__name__" . indexerString ".t" $ AST.Var Nothing s
+
+      guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [AST]
+      guardsToJs (Left gs) = traverse genGuard gs where
+        genGuard (cond, val) = do
+          cond' <- valueToJs cond
+          val'   <- valueToJs val
+          return
+            (AST.IfElse Nothing cond'
+              (AST.Block Nothing [AST.Return Nothing val']) Nothing)
+
+      guardsToJs (Right v) = return . AST.Return Nothing <$> valueToJs v
+
+  binderToJs :: Text -> [AST] -> Binder Ann -> m [AST]
+  binderToJs s done binder =
+    let (ss, _, _, _) = extractBinderAnn binder in
+    traverse (withPos ss) =<< binderToJs' s done binder
+
+  -- | Generate code in the simplified JavaScript intermediate representation for a pattern match
+  -- binder.
+  binderToJs' :: Text -> [AST] -> Binder Ann -> m [AST]
+  binderToJs' _ done NullBinder{} = return done
+  binderToJs' varName done (LiteralBinder _ l) =
+    literalToBinderJS varName done l
+  binderToJs' varName done (VarBinder _ ident) =
+    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (AST.Var Nothing varName)) : done)
+  binderToJs' varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
+    binderToJs varName done b
+  binderToJs' varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
+    js <- go (zip fields bs) done
+    return $ case ctorType of
+      ProductType -> js
+      SumType ->
+        [AST.IfElse Nothing (AST.InstanceOf Nothing (AST.Var Nothing varName) (qualifiedToJS (Ident . runProperName) ctor))
+                  (AST.Block Nothing js)
+                  Nothing]
+    where
+    go :: [(Ident, Binder Ann)] -> [AST] -> m [AST]
+    go [] done' = return done'
+    go ((field, binder) : remain) done' = do
+      argVar <- freshName
+      done'' <- go remain done'
+      js <- binderToJs argVar done'' binder
+      return (AST.VariableIntroduction Nothing argVar (Just $ indexerString (mkString $ identToJs field) $ AST.Var Nothing varName) : js)
+  binderToJs' _ _ ConstructorBinder{} =
+    internalError "binderToJs: Invalid ConstructorBinder in binderToJs"
+  binderToJs' varName done (NamedBinder _ ident binder) = do
+    js <- binderToJs varName done binder
+    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (AST.Var Nothing varName)) : js)
+
+  literalToBinderJS :: Text -> [AST] -> Literal (Binder Ann) -> m [AST]
+  literalToBinderJS varName done (NumericLiteral num) =
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral Nothing num)) (AST.Block Nothing done) Nothing]
+  literalToBinderJS varName done (CharLiteral c) =
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral Nothing (fromString [c]))) (AST.Block Nothing done) Nothing]
+  literalToBinderJS varName done (StringLiteral str) =
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral Nothing str)) (AST.Block Nothing done) Nothing]
+  literalToBinderJS varName done (BooleanLiteral True) =
+    return [AST.IfElse Nothing (AST.Var Nothing varName) (AST.Block Nothing done) Nothing]
+  literalToBinderJS varName done (BooleanLiteral False) =
+    return [AST.IfElse Nothing (AST.Unary Nothing AST.Not (AST.Var Nothing varName)) (AST.Block Nothing done) Nothing]
+  literalToBinderJS varName done (ObjectLiteral bs) = go done bs
+    where
+    go :: [AST] -> [(PSString, Binder Ann)] -> m [AST]
+    go done' [] = return done'
+    go done' ((prop, binder):bs') = do
+      propVar <- freshName
+      done'' <- go done' bs'
+      js <- binderToJs propVar done'' binder
+      return (AST.VariableIntroduction Nothing propVar (Just (indexerString prop (AST.Var Nothing varName))) : js)
+  literalToBinderJS varName done (ArrayLiteral bs) = do
+    js <- go done 0 bs
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.App Nothing (AST.Var Nothing $ unmangle "len") [AST.Var Nothing varName]) (AST.NumericLiteral Nothing (Left (fromIntegral $ length bs)))) (AST.Block Nothing js) Nothing]
+    where
+    go :: [AST] -> Integer -> [Binder Ann] -> m [AST]
+    go done' _ [] = return done'
+    go done' index (binder:bs') = do
+      elVar <- freshName
+      done'' <- go done' (index + 1) bs'
+      js <- binderToJs elVar done'' binder
+      return (AST.VariableIntroduction Nothing elVar (Just (AST.Indexer Nothing (AST.NumericLiteral Nothing (Left index)) (AST.Var Nothing varName))) : js)
+
+  -- Check that all integers fall within the valid int range for JavaScript.
+  checkIntegers :: AST -> m ()
+  checkIntegers = void . everywhereTopDownM go
+    where
+    go :: AST -> m AST
+    go (AST.Unary _ AST.Negate (AST.NumericLiteral ss (Left i))) =
+      -- Move the negation inside the literal; since this is a top-down
+      -- traversal doing this replacement will stop the next case from raising
+      -- the error when attempting to use -2147483648, as if left unrewritten
+      -- the value is `Unary Negate (NumericLiteral (Left 2147483648))`, and
+      -- 2147483648 is larger than the maximum allowed int.
+      return $ AST.NumericLiteral ss (Left (-i))
+    go js@(AST.NumericLiteral ss (Left i)) =
+      let minInt = -2147483648
+          maxInt = 2147483647
+      in if i < minInt || i > maxInt
+         then throwError . maybe errorMessage errorMessage' ss $ IntOutOfRange i "JavaScript" minInt maxInt
+         else return js
+    go other = return other

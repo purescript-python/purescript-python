@@ -23,7 +23,7 @@ constOf :: String -> Doc Py
 constOf s = viaShow $ (printf "const(%s)" s :: String)
 
 just :: String -> Doc Py
-just = viaShow
+just = pretty
 -- -- required rts:
 -- -- 1. `zfsr64`, which implements zero_fill_shift_right for 64-bit integers
 -- -- 2. `Error(msg, self) = Exception(msg)`, 
@@ -39,7 +39,7 @@ data As
 
 py_inst_of :: Doc Py -> Doc Py -> Doc Py
 py_inst_of l r =
-    just "call" <> tupled
+    just "call" <> align_tupled
       [ just "var('isinstance')"
       , l
       , r
@@ -47,15 +47,15 @@ py_inst_of l r =
 applyAs :: As -> Doc Py -> Doc Py -> Doc Py
 applyAs a l r = case a of
     AsOther f -> f (l, r)
-    AsCall f -> just "call" <> tupled [l, r]
-    AsBin op -> just "binop" <> tupled
+    AsCall f -> just "call" <> align_tupled [l, r]
+    AsBin op -> just "binop" <> align_tupled
             [ l
-            , just "BinOp." <> just op
+            , viaShow ("BinOp." <> op)
             , r
             ]
-    AsCmp op -> just "cmp" <> tupled
+    AsCmp op -> just "cmp" <> align_tupled
             [ l
-            , just "Compare." <> just op
+            , viaShow ("Compare." <> op)
             , r
             ]
 
@@ -65,17 +65,19 @@ optional Nothing = just "None"
 
 pattern Optional a <- (optional -> a)
 
+align_tupled = align . tupled
+
 instance EvalJS (Doc Py) where
 
     none = just "None"
     intLit i = just $ printf "%d" i
     doubleLit f = just $ printf "%f" f
-    strLit s = just $ printf "%s" s
+    strLit s = just $ printf "%s" (escape s)
     boolLit b = just $ printf "%s" $ show b
     objLit xs =
-        just "record" <> tupled (map (\(a, b) -> tupled [just a, b]) xs)
+        just "record" <> align_tupled (map (\(a, b) -> align_tupled [just $ escape a, b]) xs)
     
-    arrayLit xs = just "mktuple" <> tupled xs
+    arrayLit xs = just "mktuple" <> align_tupled xs
     
     unary op e =
         let 
@@ -86,7 +88,7 @@ instance EvalJS (Doc Py) where
             | BitwiseNot <- op = "UOp.INVERT"
             | Positive <- op = "UOp.POSITIVE"
             | otherwise = error "impossible unary operator"
-        in  just "uop" <>  tupled [just op', e]
+        in  just "uop" <>  align_tupled [just $ escape op', e]
 
     binary op l r =
         let
@@ -98,7 +100,7 @@ instance EvalJS (Doc Py) where
                 | is Multiply  =  AsBin "MULTIPLY"
                 | is Divide    =  AsOther $
                     \(l, r) ->
-                        just "ite" <> tupled
+                        just "ite" <> align_tupled
                           [ py_inst_of l (just "var('int')")
                           , applyAs (AsBin "FLOOR_DIVIDE") l r
                           , applyAs (AsBin "TRUE_DIVIDE")  l r
@@ -112,14 +114,14 @@ instance EvalJS (Doc Py) where
                 | is GreaterThanOrEqualTo = AsCmp "GE"
                 | is And = AsOther $
                     \(l, r) ->
-                        just "ite" <> tupled
+                        just "ite" <> align_tupled
                           [  l
                           ,  r
                           ,  just "False"
                           ]
                 | is Or = AsOther $
                     \(l, r) ->
-                        just "ite" <> tupled
+                        just "ite" <> align_tupled
                           [  l
                           ,  just "True"
                           ,  r
@@ -133,43 +135,47 @@ instance EvalJS (Doc Py) where
         in   applyAs op' l r
     
     getAttr a attr =
-        just "get_attr" <> tupled [a, just attr]
+        just "get_attr" <> align_tupled [a, just $ escape attr]
     
     setAttr a attr v =
-        just "set_attr" <> tupled [a, just attr, v]
+        just "set_attr" <> align_tupled [a, just $ escape attr, v]
     
     getItem a i =
-        just "get_item" <> tupled [a, i]
+        just "get_item" <> align_tupled [a, i]
     
     setItem a i v =
-        just "set_item" <> tupled [a, i, v]
+        just "set_item" <> align_tupled [a, i, v]
     
     func n' args body =
         let n = case n' of
                 Nothing -> "None"
                 Just (Unbox n) -> n
-        in  just "define" <> tupled [just n, list (map (just . fromJust . unbox) args), body]
-    
-    app f args = just "call_or_specialize" <> tupled (f:args)
+        in  just "define" <> align_tupled 
+                [ just n
+                ,  list (map (just . fromJust . unbox) args)
+                , body
+                ]
 
-    new f args = just "new" <> tupled (f:args)
+    app f args = just "call" <> align_tupled (f:args)
 
-    block xs = just "block" <> just "(" <+> vsep xs <+> just ")"
+    new f args = just "new" <> align_tupled (f:args)
 
-    var (Unbox n) = just "var" <> tupled [just n]
+    block xs   =    just "block" <> align_tupled xs
+
+    var (Unbox n) = just "var" <> align_tupled [just n]
     var This      = just "this"
     var Import    = just "var('load_module')"
-    assign (Unbox n) v = just "assign" <> tupled [just n, v]
-    while cond body    = just "loop"   <> tupled [cond, body]
-    upRecord old new   = just "lens"   <> tupled [old, new]
+    assign (Unbox n) v = just "assign" <> align_tupled [just n, v]
+    while cond body    = just "loop"   <> align_tupled [cond, body]
+    upRecord old new   = just "lens"   <> align_tupled [old, new]
 
-    forIn (Unbox n) seq body         = just "for_in" <> tupled [just n, seq, body]
-    forRange (Unbox n) low high body = just "for_range" <> tupled [just n, low, high, body]
-    ite cond te (Optional fe)        = just "ite" <> tupled [cond, te, fe]
-    ret v       = just "ret" <> tupled [v]
+    forIn (Unbox n) seq body         = just "for_in" <> align_tupled [just n, seq, body]
+    forRange (Unbox n) low high body = just "for_range" <> align_tupled [just n, low, high, body]
+    ite cond te (Optional fe)        = just "ite" <> align_tupled [cond, te, fe]
+    ret v       = just "ret" <> align_tupled [v]
     retNoRes    = just "ret(None)"
-    throw v     = just "throw" <> tupled [v]
-    isa inst ty = just "isa"<> tupled [inst, ty]
-    comment cs exp = just "document" <> tupled [vsep (map just cs), exp]
+    throw v     = just "throw" <> align_tupled [v]
+    isa inst ty = just "isa"<> align_tupled [inst, ty]
+    comment cs exp = just "document" <> align_tupled [vsep (map just cs), exp]
     located SourceLoc {line, col, filename} term =
-        just "metadata" <> tupled [pretty line, pretty col, just filename, term]
+        just "metadata" <> align_tupled [pretty line, pretty col, just $ escape filename, term]

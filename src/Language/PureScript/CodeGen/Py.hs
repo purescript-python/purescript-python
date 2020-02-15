@@ -72,7 +72,7 @@ moduleToJS
    . (Monad m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
   -> Maybe AST
-  -> m [AST]
+  -> m AST
 moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
@@ -98,7 +98,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     let exps' = AST.ArrayLiteral Nothing $
                     map (AST.StringLiteral Nothing . mkString . runIdent) standardExps ++
                     map (AST.StringLiteral Nothing . mkString . runIdent) foreignExps
-    return $ moduleBody ++ [AST.Assignment Nothing (AST.Var Nothing $ unmangle "__all__") exps']
+    return $ AST.Block Nothing $ moduleBody ++ [AST.Assignment Nothing (AST.Var Nothing $ unmangle "__all__") exps']
 
   where
 

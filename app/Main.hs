@@ -28,7 +28,7 @@ import qualified Language.PureScript.Hierarchy as P
 import Language.PureScript.Options (Options(..))
 
 
-import Language.PureScript.CodeGen.JS (moduleToJs)
+import Language.PureScript.CodeGen.Py (moduleToJS)
 import Language.PureScript.CodeGen.Py.Printer (Py)
 import Language.PureScript.CodeGen.Py.Eval (finally)
 
@@ -47,47 +47,34 @@ instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither $ State.get
     local r m = m
 
-opts = Options { optionsVerboseErrors = True
-               , optionsNoComments = False
-               , optionsCodegenTargets = S.empty
-               }
-                
-parseOptsKey m = \case
-    "--run": xs -> parseOptsKey (M.insert "run" "" m) xs
-    "-h"   : xs -> parseOptsKey (M.insert "h" "" m) xs
-    "-v"   : xs -> parseOptsKey (M.insert "v" "" m) xs
-    k      : xs -> Left k
-    []          -> Right m
-
-parseOptVal k m = \case
-    v : xs -> parseOptsKey (M.insert k v m) xs
-    []     -> Left k
-
+defaultOpts =
+    Options { optionsVerboseErrors = True
+            , optionsNoComments = False
+            , optionsCodegenTargets = S.empty
+            }
 
 main :: IO ()
 main = do
     opts <- getArgs
-    case parseOptsKey M.empty opts of
-        Left k -> putStrLn (printf "Unknown option (%s)." k) >> exitFailure
-        Right v -> wain v
+    case opts of
+        ["--top-of-out", baseOutDir, "--corefn", jsonFile] ->
+            cg baseOutDir jsonFile
+        _ ->  putStrLn "Malformed options, expect form --top-of-out <dir1> --corefn <xxx.json>." >> exitFailure
 
-wain m
-    | "--run" `M.member` m = return ()
-    | otherwise = exitFailure
-
-transpile :: FilePath -> FilePath -> IO ()
-transpile baseOutpath jsonFile = do
+cg :: FilePath -> FilePath -> IO ()
+cg baseOutDir jsonFile = do
   jsonText <- T.decodeUtf8 <$> B.readFile jsonFile
   let module' = jsonToModule $ parseJson jsonText
 
-  case State.runStateT (runSTEither (runSupplyT 5 (moduleToJs module' Nothing))) opts of
+  case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
+        moduleToJS module' Nothing of
       Left e -> putStrLn (show (e :: MultipleErrors)) >> exitFailure
-      Right ((asts, _), _) -> do
+      Right ((ast, _), _) -> do
         let
-            implementation = T.unlines [doc2Text (finally ast :: Doc Py) | ast <- asts]
-            outPath = runToModulePath $ moduleName module'
-            implPath = outPath </> "impl.py"
-        createDirectoryIfMissing True outPath
+            implementation = doc2Text (finally ast :: Doc Py)
+            outDir = runToModulePath baseOutDir $ moduleName module'
+            implPath = outDir </> "impl.py"
+        createDirectoryIfMissing True outDir
         T.writeFile implPath implementation
 
 
@@ -97,8 +84,9 @@ doc2Text = renderStrict . layoutPretty defaultLayoutOptions
 interfaceFileName :: String -> FilePath
 interfaceFileName mn = mn <> ".py"
 
-runToModulePath :: P.ModuleName -> String
-runToModulePath (P.ModuleName pns) = joinPath . map T.unpack $ (P.runProperName <$> pns)
+runToModulePath :: FilePath -> P.ModuleName -> String
+runToModulePath base (P.ModuleName pns) =
+        joinPath . (base:) . map T.unpack $ (P.runProperName <$> pns)
 
 parseJson :: Text -> Value
 parseJson text

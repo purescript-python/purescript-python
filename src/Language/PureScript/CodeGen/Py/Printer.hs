@@ -26,7 +26,7 @@ just :: String -> Doc Py
 just = pretty
 -- -- required rts:
 -- -- 1. `zfsr64`, which implements zero_fill_shift_right for 64-bit integers
--- -- 2. `Error(msg, self) = Exception(msg)`, 
+-- -- 2. `Error(msg, self) = Exception(msg)`,
 
 
 
@@ -76,11 +76,11 @@ instance EvalJS (Doc Py) where
     boolLit b = just $ printf "%s" $ show b
     objLit xs =
         just "record" <> align_tupled (map (\(a, b) -> align_tupled [just $ escape a, b]) xs)
-    
+
     arrayLit xs = just "mktuple" <> align_tupled xs
-    
+
     unary op e =
-        let 
+        let
           op' :: String
           op'
             | Negate <- op = "UOp.NEGATIVE"
@@ -93,7 +93,7 @@ instance EvalJS (Doc Py) where
     binary op l r =
         let
             is a = a == op
-            
+
             op' :: As
             op' | is Add       =  AsBin "ADD"
                 | is Subtract  =  AsBin "SUBTRACT"
@@ -133,24 +133,24 @@ instance EvalJS (Doc Py) where
                 | is ShiftRight = AsBin "RSHIFT"
                 | is ZeroFillShiftRight = AsCall "var('zfsr64')"
         in   applyAs op' l r
-    
+
     getAttr a attr =
         just "get_attr" <> align_tupled [a, just $ escape attr]
-    
+
     setAttr a attr v =
         just "set_attr" <> align_tupled [a, just $ escape attr, v]
-    
+
     getItem a i =
         just "get_item" <> align_tupled [a, i]
-    
+
     setItem a i v =
         just "set_item" <> align_tupled [a, i, v]
-    
+
     func n' args body =
         let n = case n' of
                 Nothing -> "None"
                 Just (Unbox n) -> n
-        in  just "define" <> align_tupled 
+        in  just "define" <> align_tupled
                 [ just n
                 ,  list (map (just . fromJust . unbox) args)
                 , body

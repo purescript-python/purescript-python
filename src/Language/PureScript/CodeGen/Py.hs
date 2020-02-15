@@ -95,7 +95,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     comments <- not <$> asks optionsNoComments
     let header | comments && not (null coms) =
                     mk . mkString . unComments $ coms
-               | otherwise = mk "No document"        
+               | otherwise = mk "No document"
                where mk =  AST.StringLiteral Nothing
     let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
@@ -217,11 +217,11 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   -- to avoid the mixture of indexing and accessing in JavaScript.
   indexerString :: PSString -> AST -> AST
   indexerString prop = AST.Indexer Nothing (AST.ArrayLiteral Nothing [AST.StringLiteral Nothing prop])
-  
+
 
   accessorString :: PSString -> AST -> AST
   accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
-  
+
 
   -- | Generate code in the simplified JavaScript intermediate representation for a value or expression.
   valueToJs :: Expr Ann -> m AST
@@ -297,13 +297,13 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
            , AST.Assignment Nothing (accessorString "value" (AST.Var Nothing (properToJs ctor)))
              $ AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) []
            ]
-           
+
   valueToJs' (Constructor _ _ ctor fields) =
     let constructor =
           let body = [ AST.Assignment Nothing ((indexerString $ mkString $ identToJs f) this) (var f) | f <- fields ]
           in AST.Function Nothing (Just (properToJs ctor)) (identToJs `map` fields) (AST.Block Nothing $ body ++ [AST.Return Nothing this])
     in return constructor
-  
+
   this = AST.Var Nothing $ unmangle "this"
 
   literalToValueJS :: SourceSpan -> Literal (Expr Ann) -> m AST
@@ -327,7 +327,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
       -- Also we should inline it if possible, to avoid function calls.
       jsNewObj = AST.ObjectLiteral Nothing sts
     return $ AST.App Nothing (accessorString "special@record_update" obj) [jsNewObj]
-    
+
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable.
   varToJs :: Qualified Ident -> AST

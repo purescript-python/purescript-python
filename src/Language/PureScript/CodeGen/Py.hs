@@ -1,5 +1,11 @@
 -- | This is a modification based on Language.PureScript.CodeGen.JS,
 -- hence we preserve the license under PROJECT_ROOT/licenses/direct-from-purescript.
+-- To make things easier to maintain, we didn't change this file much,
+-- even the names of codegen functions is still `**Js`. Instead, only
+-- the code leading to the incapability of transforming JavaScript to Python
+-- is modified. In this approach, we succeeded in reusing the existing optimizers and
+-- keeping away from other effort-consuming stuffs.
+--
 -- | This module generates code in the core imperative representation from
 -- elaborated PureScript code.
 {-# LANGUAGE
@@ -69,10 +75,10 @@ unComments (x:xs) = T.append hd tl
 -- module.
 moduleToJS
   :: forall m
-   . (Monad m, MonadSupply m, MonadError MultipleErrors m)
+   . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
   -> Maybe AST
-  -> m AST
+  -> m [AST]
 moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
@@ -86,9 +92,9 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
       . filter (flip S.member usedModuleNames)
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
-    -- comments <- not <$> asks optionsNoComments
-    let header | not (null coms) -- && comments
-                  = mk . mkString . unComments $ coms
+    comments <- not <$> asks optionsNoComments
+    let header | comments && not (null coms) =
+                    mk . mkString . unComments $ coms
                | otherwise = mk "No document"        
                where mk =  AST.StringLiteral Nothing
     let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
@@ -178,22 +184,20 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   -- The main purpose of this function is to handle code generation for comments.
   nonRecToJS :: Ann -> Ident -> Expr Ann -> m AST
   nonRecToJS a i e@(extractAnn -> (_, com, _, _)) | not (null com) = do
-    -- withoutComment <- asks optionsNoComments
-    -- if withoutComment
-    --    then nonRecToJS a i (modifyAnn removeComments e)
-      --  else
-          AST.Comment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
+    withoutComment <- asks optionsNoComments
+    if withoutComment
+       then nonRecToJS a i (modifyAnn removeComments e)
+       else AST.Comment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
   nonRecToJS (ss, _, _, _) ident val = do
     js <- valueToJs val
     withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)
 
   withPos :: SourceSpan -> AST -> m AST
-  withPos ss js = return $ -- do
-    -- withSM <- asks (elem JSSourceMap . optionsCodegenTargets)
-    -- return $ if withSM
-      -- then 
-        withSourceSpan ss js
-      -- else js
+  withPos ss js = do
+    withSM <- asks (elem JSSourceMap . optionsCodegenTargets)
+    return $ if withSM
+      then withSourceSpan ss js
+      else js
 
   -- | Generate code in the simplified JavaScript intermediate representation for a variable based on a
   -- PureScript identifier.

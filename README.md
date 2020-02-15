@@ -15,8 +15,8 @@ Then I found PureScript, and now I think I love it.
 
 ## Status
 
-This compiles PureScript `CoreFn` to [`PySExpr`](https://github.com/thautwarm/PySExpr), as a result,
-making PureScript run fast in Python since Python 3.5.
+After slightly modifying a JavaScript-like IR produced by the builtin compiler,
+PureScript gets compiled to [`PySExpr`](https://github.com/thautwarm/PySExpr) and shall work since Python 3.5.
 
 The code generation itself is finished, but still needs testing.
 

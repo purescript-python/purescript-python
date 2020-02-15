@@ -127,7 +127,7 @@ loaderCode :: Text
 loaderCode =
     T.unlines . map T.pack $
       [
-        "from purescript_python_loader import LoadIt"
+        "from purescripto import LoadIt"
       , "__py__ = globals()"
       , "purescript_module = LoadIt(__name__, __file__)"
       ]

@@ -5,9 +5,11 @@
 
 This is the successor to my works of Idris-Python.
 
-Idris didn't provide me metadata such as source code positions hence debugging(especially FFI) is horrible.
+Idris didn't provide me metadata such as source code positions hence debugging(especially FFI) is horrible,
+but PureScript's IR output is pretty nice.
 
-Besides, Idris FFI, though designed smart, but to be honest not that "industrially" practical.
+Besides, Idris FFI, though designed smart, but to be honest not that "industrially" practical, while
+PureScript's Haskell-like `foreign import` mechanism is extremely straightforward and flexible.
 
 Then I found PureScript, and now I think I love it.
 

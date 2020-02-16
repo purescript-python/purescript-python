@@ -37,7 +37,7 @@ After processing this module via the command
 
 ```shell
 # `output` is the directory produced by the purescript build tool `spago`.
-pspy --foreign-top xxx/yyy/foreign_dir --out-top aaa/bbb/output_top_dir --corefn output/A.B/path_to_corefn.json
+pspy-one-module --foreign-top xxx/yyy/foreign_dir --out-top aaa/bbb/output_top_dir --corefn output/A.B/path_to_corefn.json
 ```
 
 We read `CoreFn` from `.json` file and know we're generating purescript module `A.B`.
@@ -79,6 +79,7 @@ The generated `PySExpr` is in `purescript_impl.src.py`.
 
 <summary> This is an example of generated PySExpr </summary>
 
+The command is `pspy-one-module --foreign-top ./src --out-top ./python --corefn .\output\\Main\corefn.json`
 
 ```python
 # example purescript_impl.src.py
@@ -135,16 +136,17 @@ If code object has been cached and hasn't been out of date,
 the cached code object will be used, instead of invoking `purescript_impl.src.py`.
 
 
-`__ps__` has a Python global `exports` with all export symbols bound,
-module `purescript_impl` will bind all symbol names to its `__all__` and its global dictionary.
+`__ps__` is the Python global variable `exports` in the hidden module made by `purescript_impl.src.py`,  with all export symbols bound.
+
+Module `purescript_impl` will then bind all symbol names to its `__all__` and the corresponding values to its global dictionary.
 
 
 The code of `purescript_impl.py` which provides above functionalities is fixed:
 
 ```python
 from purescripto import LoadPureScript
-_py__ = globals()
-_ps__ = LoadPureScript(__name__, __file__)
-__all__ = list(__ps__.exports)
-__py__.update(__ps__.exports)
+__py__ = globals()
+__ps__ = LoadPureScript(__file__, __name__)
+__all__ = list(__ps__)
+__py__.update(__ps__)
 ```

@@ -129,7 +129,7 @@ loaderCode =
       [
         "from purescripto import LoadPureScript"
       , "_py__ = globals()"
-      , "_ps__ = LoadPureScript(__name__, __file__)"
-      , "__all__ = list(__ps__.exports)"
-      , "__py__.update(__ps__.exports)"
+      , "_ps__ = LoadPureScript(__file__, __name__)"
+      , "__all__ = list(__ps__)"
+      , "__py__.update(__ps__)"
       ]      

@@ -16,7 +16,7 @@ unmanglePrefix = "special@"
 --   - __all__
 --   - import
 --   - this
-unmangle name = T.append unmanglePrefix name
+unmangle = T.append unmanglePrefix
 
 data SourceLoc
     = SourceLoc

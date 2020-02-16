@@ -59,10 +59,8 @@ import qualified Language.PureScript.Constants as C
 
 import System.FilePath.Posix ((</>))
 import Language.PureScript.CodeGen.Py.Common (unmangle)
+import Language.PureScript.CodeGen.Py.Naming (identToPy)
 
-
-runModuleName :: P.ModuleName -> Text
-runModuleName (P.ModuleName pns) = T.intercalate "." (P.runProperName <$> pns)
 
 unComments :: [Comment] -> Text
 unComments [] = T.empty
@@ -77,9 +75,9 @@ moduleToJS
   :: forall m
    . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
-  -> Maybe AST
+  -> Text
   -> m (Bool, AST)
-moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
+moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -89,7 +87,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
     jsImports <- traverse (importToJs mnLookup)
-      . filter (flip S.member usedModuleNames)
+      . filter (`S.member` usedModuleNames)
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
@@ -97,15 +95,32 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
                     mk . mkString . unComments $ coms
                | otherwise = mk "No document"
                where mk =  AST.StringLiteral Nothing
-    let foreignImport = AST.App Nothing (AST.Var Nothing $ unmangle "import") 
-                        [AST.StringLiteral Nothing ".foreign", AST.Var Nothing $ unmangle "__package__"]
+    let foreignImport = AST.VariableIntroduction Nothing (unmangle "$foreign") $
+                        Just $
+                          AST.App Nothing pyimport
+                            [ AST.StringLiteral Nothing $ mkString $ runForeignModuleName mn ]
     let hasForeign = not $ null foreigns
     let foreign' = [foreignImport | hasForeign]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
-    return (hasForeign, AST.Block Nothing moduleBody)
+
+    let foreignExps = exps `intersect` foreigns
+    let standardExps = exps \\ foreignExps
+    let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToPy) standardExps
+                               ++ map (mkString . runIdent &&& foreignIdent) foreignExps
+    let exportObj = [AST.Assignment Nothing (AST.Var Nothing $ unmangle "exports") exps']
+    return (hasForeign, AST.Block Nothing $ moduleBody ++ exportObj)
   
   where
+  this     = AST.Var Nothing $ unmangle "this"
+  pyimport = AST.Var Nothing $ unmangle "import"
 
+  runModuleNameImpl :: Text -> P.ModuleName -> Text
+  runModuleNameImpl suffix (P.ModuleName pns) =
+    T.intercalate "."  ((package : (P.runProperName <$> pns)) ++ [suffix])
+  
+  runForeignModuleName = runModuleNameImpl "purescript_foreign"
+  runModuleName        = runModuleNameImpl "purescript_impl"
+  
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
   getNames (NonRec _ ident _) = [ident]
@@ -138,7 +153,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
     let moduleBody = AST.App Nothing (AST.Var Nothing $ unmangle "import")
-          [AST.StringLiteral Nothing (fromString (".." ++ T.unpack (runModuleName mn'))), AST.Var Nothing $ unmangle "__package__"]
+          [AST.StringLiteral Nothing $ mkString $  runModuleName mn']
     withPos ss $ AST.VariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
@@ -188,7 +203,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
        else AST.Comment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
   nonRecToJS (ss, _, _, _) ident val = do
     js <- valueToJs val
-    withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)
+    withPos ss $ AST.VariableIntroduction Nothing (identToPy ident) (Just js)
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
@@ -200,7 +215,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
   -- | Generate code in the simplified JavaScript intermediate representation for a variable based on a
   -- PureScript identifier.
   var :: Ident -> AST
-  var = AST.Var Nothing . identToJs
+  var = AST.Var Nothing . identToPy
 
   -- | Generate code in the simplified JavaScript intermediate representation for an accessor based on
   -- a PureScript identifier. If the name is not valid in JavaScript (symbol based, reserved name) an
@@ -214,12 +229,11 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
   -- | As `a[["attr"]]` is impossible, we use `a[["attr"]]` to represent `a.attr`,
   -- to avoid the mixture of indexing and accessing in JavaScript.
   indexerString :: PSString -> AST -> AST
-  indexerString prop = AST.Indexer Nothing (AST.ArrayLiteral Nothing [AST.StringLiteral Nothing prop])
+  indexerString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
 
 
   accessorString :: PSString -> AST -> AST
-  accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
-
+  accessorString prop = AST.Indexer Nothing (AST.ArrayLiteral Nothing [AST.StringLiteral Nothing prop])
 
   -- | Generate code in the simplified JavaScript intermediate representation for a value or expression.
   valueToJs :: Expr Ann -> m AST
@@ -242,7 +256,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
     extendObj obj sts
   valueToJs' e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
     let args = unAbs e
-    in return $ AST.Function Nothing Nothing (map identToJs args) (AST.Block Nothing $ map assign args)
+    in return $ AST.Function Nothing Nothing (map identToPy args) (AST.Block Nothing $ map assign args)
     where
     unAbs :: Expr Ann -> [Ident]
     unAbs (Abs _ arg val) = arg : unAbs val
@@ -254,7 +268,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
     ret <- valueToJs val
     let jsArg = case arg of
                   UnusedIdent -> []
-                  _           -> [identToJs arg]
+                  _           -> [identToPy arg]
     return $ AST.Function Nothing Nothing jsArg (AST.Block Nothing [AST.Return Nothing ret])
   valueToJs' e@App{} = do
     let (f, args) = unApp e []
@@ -298,11 +312,9 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
 
   valueToJs' (Constructor _ _ ctor fields) =
     let constructor =
-          let body = [ AST.Assignment Nothing ((indexerString $ mkString $ identToJs f) this) (var f) | f <- fields ]
-          in AST.Function Nothing (Just (properToJs ctor)) (identToJs `map` fields) (AST.Block Nothing $ body ++ [AST.Return Nothing this])
+          let body = [ AST.Assignment Nothing ((indexerString $ mkString $ identToPy f) this) (var f) | f <- fields ]
+          in AST.Function Nothing (Just (properToJs ctor)) (identToPy `map` fields) (AST.Block Nothing $ body ++ [AST.Return Nothing this])
     in return constructor
-
-  this = AST.Var Nothing $ unmangle "this"
 
   literalToValueJS :: SourceSpan -> Literal (Expr Ann) -> m AST
   literalToValueJS ss (NumericLiteral (Left i)) = return $ AST.NumericLiteral (Just ss) (Left i)
@@ -337,10 +349,10 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
   qualifiedToJS f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = AST.Var Nothing . runIdent $ f a
   qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
-  qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
+  qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToPy (f a)
 
   foreignIdent :: Ident -> AST
-  foreignIdent ident = accessorString (mkString $ runIdent ident) (AST.Var Nothing "$foreign")
+  foreignIdent ident = accessorString (mkString $ runIdent ident) (AST.Var Nothing $ unmangle "$foreign")
 
   -- | Generate code in the simplified JavaScript intermediate representation for pattern match binders
   -- and guards.
@@ -398,7 +410,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
   binderToJs' varName done (LiteralBinder _ l) =
     literalToBinderJS varName done l
   binderToJs' varName done (VarBinder _ ident) =
-    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (AST.Var Nothing varName)) : done)
+    return (AST.VariableIntroduction Nothing (identToPy ident) (Just (AST.Var Nothing varName)) : done)
   binderToJs' varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
     binderToJs varName done b
   binderToJs' varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
@@ -416,12 +428,12 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) Nothing =
       argVar <- freshName
       done'' <- go remain done'
       js <- binderToJs argVar done'' binder
-      return (AST.VariableIntroduction Nothing argVar (Just $ indexerString (mkString $ identToJs field) $ AST.Var Nothing varName) : js)
+      return (AST.VariableIntroduction Nothing argVar (Just $ indexerString (mkString $ identToPy field) $ AST.Var Nothing varName) : js)
   binderToJs' _ _ ConstructorBinder{} =
     internalError "binderToJs: Invalid ConstructorBinder in binderToJs"
   binderToJs' varName done (NamedBinder _ ident binder) = do
     js <- binderToJs varName done binder
-    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (AST.Var Nothing varName)) : js)
+    return (AST.VariableIntroduction Nothing (identToPy ident) (Just (AST.Var Nothing varName)) : js)
 
   literalToBinderJS :: Text -> [AST] -> Literal (Binder Ann) -> m [AST]
   literalToBinderJS varName done (NumericLiteral num) =

@@ -2,7 +2,7 @@ module Main where
 import System.Exit
 import System.Environment
 import System.Directory (createDirectoryIfMissing)
-import System.FilePath ((</>), joinPath)
+import System.FilePath ((</>), joinPath, takeFileName)
 
 import Text.Printf (printf)
 import qualified Data.Map as M
@@ -48,7 +48,7 @@ import qualified Control.Monad.State as State
 import Monads.STEither
     
 instance MonadReader Options (STEither Options MultipleErrors) where
-    ask = STEither $ State.get
+    ask = STEither State.get
     local r m = m
 
 defaultOpts =
@@ -69,26 +69,26 @@ cg :: FilePath -> FilePath -> FilePath -> IO ()
 cg foreignBaseDir baseOutDir jsonFile = do
   jsonText <- T.decodeUtf8 <$> B.readFile jsonFile
   let module' = jsonToModule $ parseJson jsonText
-
+      mn      = moduleName module'
+      package = takeFileName baseOutDir
   case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
-        moduleToJS module' Nothing of
-      Left e -> putStrLn (show (e :: MultipleErrors)) >> exitFailure
+        moduleToJS module' (T.pack package) of
+      Left e -> print (e :: MultipleErrors) >> exitFailure
       Right (((hasForeign, ast), _), _) -> do
         let
             implCode = legalizedCodeGen (finally ast)
-            mn     = moduleName module'
             outDir = runToModulePath baseOutDir mn
             ffiDir = runToModulePath foreignBaseDir mn
             entryPath = outDir </> "__init__.py"
-            implSrcPath = outDir </> "impl.src.py"
-            implCachePath = outDir </> "impl.py"
+            implSrcPath = outDir </> "purescript_impl.src.py"
+            implLoaderPath = outDir </> "purescript_impl.py"
             foreignSrcPath = ffiDir <> ".py"
-            foreignDestPath = outDir </> "foreign.py"
+            foreignDestPath = outDir </> "purescript_foreign.py"
 
         createDirectoryIfMissing True outDir
-        T.writeFile entryPath entry
+        T.writeFile entryPath T.empty
         T.writeFile implSrcPath implCode
-        T.writeFile implCachePath loaderCode
+        T.writeFile implLoaderPath loaderCode
         when hasForeign $ do
             foreignCode <- T.readFile foreignSrcPath
             T.writeFile foreignDestPath foreignCode
@@ -127,19 +127,9 @@ loaderCode :: Text
 loaderCode =
     T.unlines . map T.pack $
       [
-        "from purescripto import LoadIt"
-      , "__py__ = globals()"
-      , "purescript_module = LoadIt(__name__, __file__)"
-      ]
-
-
-entry :: Text
-entry =
-    T.unlines . map T.pack $
-      [
-        "from . import impl"
-      , "__py__ = globals()"
-      , "__ps__ = impl.purescript_module"
-      , "__all__ = __ps__.__all__"
-      , "__py__.update({attr: __ps__[attr] for attr in __all__})"
+        "from purescripto import LoadPureScript"
+      , "_py__ = globals()"
+      , "_ps__ = LoadPureScript(__name__, __file__)"
+      , "__all__ = list(__ps__.exports)"
+      , "__py__.update(__ps__.exports)"
       ]      

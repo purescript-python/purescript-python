@@ -73,21 +73,58 @@ If `A.B` didn't use FFI directly, the directory tree of finally generated Python
 `purescript_impl.src.py`
 -----------------------------------------
 
-The generated `PySExpr` is in `purescript_impl.src.py`, following is an example:
+The generated `PySExpr` is in `purescript_impl.src.py`. 
+
+<details>
+
+<summary> This is an example of generated PySExpr </summary>
+
+
 ```python
 # example purescript_impl.src.py
 from py_sexpr.terms import *
 from py_sexpr.stack_vm.emit import module_code
 res = block( "No document"
-           , call(var('import_module'), ".foreign", var("__package__"))
+           , assign( "$foreign"
+                   , call( var('import_module')
+                         , "python.Main.purescript_foreign" ) )
            , assign( "ps_Unit"
                    , block( define("ps_Unit", [], block(this))
                           , set_attr( var("ps_Unit")
                                     , "value"
                                     , new(var("ps_Unit")) ) ) )
-           ...)
-res = module_code(res) # this is code object
+           , assign( "ps_main"
+                   , call( get_attr(var("$foreign"), "println")
+                         , metadata(8, 16, "src\Main.purs", 1) ) )
+           , assign( "exports"
+                   , record( ("Unit", var("ps_Unit"))
+                           , ("main", var("ps_main"))
+                           , ( "println"
+                             , get_attr(var("$foreign"), "println") ) ) ) )
+# this is code object
+res = module_code(res)
 ```
+
+
+</details>
+
+
+<details>
+
+<summary> Above example is from this source code </summary>
+
+```purescript
+module Main where
+
+data Effect a
+data Unit = Unit
+
+foreign import println :: forall a. a -> Effect Unit
+
+main = println 1
+```
+
+</details>
 
 `purescript_impl.py`
 --------------------------

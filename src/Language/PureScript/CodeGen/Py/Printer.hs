@@ -1,3 +1,7 @@
+-- -- required rts:
+-- 1. `zfsr64`, which implements zero_fill_shift_right for 64-bit integers
+-- 2. `Error(msg, self) = Exception(msg)`
+-- 3. import_module from importlib (>=Python 3.5)
 module Language.PureScript.CodeGen.Py.Printer where
 
 import Language.PureScript.CodeGen.Py.Common
@@ -18,16 +22,8 @@ import Data.Text.Prettyprint.Doc
 
 data Py
 
-
-constOf :: String -> Doc Py
-constOf s = viaShow $ (printf "const(%s)" s :: String)
-
 just :: String -> Doc Py
 just = pretty
--- -- required rts:
--- -- 1. `zfrs64`, which implements zero_fill_shift_right for 64-bit integers
--- -- 2. `Error(msg, self) = Exception(msg)`,
-
 
 
 data As

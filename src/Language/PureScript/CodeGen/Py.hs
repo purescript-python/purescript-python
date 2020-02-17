@@ -308,6 +308,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
            [ AST.Function Nothing (Just (properToJs ctor)) [] (AST.Block Nothing [this])
            , AST.Assignment Nothing (accessorString "value" (AST.Var Nothing (properToJs ctor)))
              $ AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) []
+           , AST.Var Nothing (properToJs ctor)
            ]
 
   valueToJs' (Constructor _ _ ctor fields) =

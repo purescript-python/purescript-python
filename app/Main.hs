@@ -123,7 +123,7 @@ legalizedCodeGen projectPath sexpr =
       , T.pack "from os.path import join as joinpath"
       , T.pack $ printf  "project_path = %s" (escape projectPath)
       , doc2Text (bindSExpr "res" sexpr)
-      , T.pack "res = module_code(res)"
+      , T.pack "res = module_code(res, filename=__file__, name=__name__)"
       ]
 
 loaderCode :: Text

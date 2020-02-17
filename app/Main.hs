@@ -70,9 +70,7 @@ cg foreignBaseDir baseOutDir jsonFile = do
   jsonText <- T.decodeUtf8 <$> B.readFile jsonFile
   let module' = jsonToModule $ parseJson jsonText
       mn      = moduleName module'
-      package = takeFileName baseOutDir >>= \case
-                  '-' -> ['_']
-                  a   -> [a]
+      package = takeFileName baseOutDir
   case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
         moduleToJS module' (T.pack package) of
       Left e -> print (e :: MultipleErrors) >> exitFailure

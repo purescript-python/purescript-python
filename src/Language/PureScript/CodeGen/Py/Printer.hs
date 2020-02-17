@@ -40,6 +40,7 @@ py_inst_of l r =
       , l
       , r
       ]
+
 applyAs :: As -> Doc Py -> Doc Py -> Doc Py
 applyAs a l r = case a of
     AsOther f -> f (l, r)
@@ -172,7 +173,7 @@ instance EvalJS (Doc Py) where
     retNoRes    = just "ret(None)"
     throw v     = just "throw" <> align_tupled [v]
     isa inst ty = just "isa"<> align_tupled [inst, ty]
-    comment cs exp = just "document" <> align_tupled [vsep (map just cs), exp]
+    comment cs exp = just "document" <> align_tupled [vsep (map (just . escape) cs), exp]
     located SourceLoc {line, col, filename} term =
         just "metadata" <> align_tupled [pretty line, pretty col, just $ escape filename, term]
 

@@ -6,13 +6,13 @@
 module Language.PureScript.CodeGen.Py.Eval where
 
 
-import Language.PureScript.CodeGen.Py.Common (BoxedName, SourceLoc(..), mkName)
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.Comments (Comment(..))
+import Language.PureScript.CodeGen.Py.Common (BoxedName, SourceLoc(..), mkName)
 import Language.PureScript.PSString (PSString, decodeStringWithReplacement)
-import Language.PureScript.AST.SourcePos
-import Data.Text (Text)
 
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.List as L
 import qualified Data.Map  as M
@@ -62,7 +62,7 @@ class EvalJS repr where
     retNoRes :: repr
     throw :: repr -> repr
     isa :: repr -> repr -> repr
-    comment :: [String] -> repr -> repr
+    comment :: [Text] -> repr -> repr
     located :: SourceLoc -> repr -> repr
 
 finally :: EvalJS repr => AST -> repr
@@ -147,8 +147,8 @@ finally n = loc $ case n of
 
     Comment _ cs exp ->
         let f = \case
-             LineComment x -> show x
-             BlockComment x -> show x
+             LineComment x -> x
+             BlockComment x -> x
         in comment (map f cs) (finally exp)
 
     where

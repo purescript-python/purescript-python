@@ -352,7 +352,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToPy (f a)
 
   foreignIdent :: Ident -> AST
-  foreignIdent ident = accessorString (mkString $ runIdent ident) (AST.Var Nothing $ unmangle "$foreign")
+  foreignIdent ident = indexerString (mkString $ runIdent ident) (AST.Var Nothing $ unmangle "$foreign")
 
   -- | Generate code in the simplified JavaScript intermediate representation for pattern match binders
   -- and guards.

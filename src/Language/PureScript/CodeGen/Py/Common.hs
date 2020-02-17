@@ -20,8 +20,8 @@ unmangle = T.append unmanglePrefix
 
 data SourceLoc
     = SourceLoc
-      { line :: Int
-      , col :: Int
+      { line     :: Int
+      , col      :: Int
       , filename :: String
       }
 

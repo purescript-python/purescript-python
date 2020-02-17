@@ -9,7 +9,6 @@ import qualified Data.Map as M
 
 import Data.Aeson hiding (Options)
 import Data.Aeson.Types hiding (Options)
-
 import Data.Text (Text, pack, unpack)
 
 import qualified Data.List as List
@@ -22,18 +21,19 @@ import qualified Data.Text.Lazy.Encoding as L
 import qualified Data.ByteString as B
 import qualified Data.Set as S
 
+
 import Language.PureScript.CoreFn
 import Language.PureScript.CoreFn.FromJSON
 import Language.PureScript.Errors (MultipleErrors)
+import Language.PureScript.Options (Options(..))
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Hierarchy as P
-import Language.PureScript.Options (Options(..))
 
 
 import Language.PureScript.CodeGen.Py (moduleToJS)
 import Language.PureScript.CodeGen.Py.Printer (Py, bindSExpr)
-import Language.PureScript.CodeGen.Py.Eval (finally)
-import Language.PureScript.CodeGen.Py.Common (escape)
+import Language.PureScript.CodeGen.Py.Eval (finally, takeSourceLoc)
+import Language.PureScript.CodeGen.Py.Common (escape, SourceLoc(..))
 
 import Control.Monad.Supply
 import Control.Monad.Supply.Class
@@ -65,6 +65,8 @@ main = do
             cg foreignBaseDir baseOutDir jsonFile
         _ ->  putStrLn "Malformed options, expect form --foreign-top <dir0> --out-top <dir1> --corefn <xxx.json>." >> exitFailure
 
+annSs (ss, _, _, _) = ss
+
 cg :: FilePath -> FilePath -> FilePath -> IO ()
 cg foreignBaseDir baseOutDir jsonFile = do
   pwd      <- getCurrentDirectory
@@ -77,7 +79,8 @@ cg foreignBaseDir baseOutDir jsonFile = do
       Left e -> print (e :: MultipleErrors) >> exitFailure
       Right (((hasForeign, ast), _), _) -> do
         let
-            implCode = legalizedCodeGen pwd (finally ast)
+            implCode = legalizedCodeGen (runModuleName package mn) pwd (finally ast)
+
             outDir = runToModulePath baseOutDir mn
             ffiDir = runToModulePath foreignBaseDir mn
             entryPath = outDir </> "__init__.py"
@@ -94,9 +97,13 @@ cg foreignBaseDir baseOutDir jsonFile = do
             foreignCode <- T.readFile foreignSrcPath
             T.writeFile foreignDestPath foreignCode
 
-runToModulePath :: FilePath -> P.ModuleName -> String
+runToModulePath ::  FilePath -> P.ModuleName -> String
 runToModulePath base (P.ModuleName pns) =
         joinPath . (base:) . map T.unpack $ (P.runProperName <$> pns)
+
+runModuleName ::  FilePath -> P.ModuleName -> String
+runModuleName base (P.ModuleName pns) =
+        List.intercalate "." . (base:) . map T.unpack $ (P.runProperName <$> pns)        
 
 parseJson :: Text -> Value
 parseJson text
@@ -114,16 +121,21 @@ jsonToModule value =
 doc2Text :: Doc ann -> T.Text
 doc2Text = renderStrict . layoutPretty defaultLayoutOptions
 
-legalizedCodeGen :: FilePath -> Doc Py -> Text
-legalizedCodeGen projectPath sexpr =
+legalizedCodeGen :: String -> FilePath -> Doc Py -> Text
+legalizedCodeGen mName projectPath sexpr =
     T.unlines
       [
         T.pack "from py_sexpr.terms import *"
       , T.pack "from py_sexpr.stack_vm.emit import module_code"
-      , T.pack "from os.path import join as joinpath"
+      , T.pack "from os.path import join as _joinpath"
+      , T.pack "def joinpath(a, b):"
+      , T.pack "    global joinpath, __file__"
+      , T.pack "    joinpath = _joinpath"
+      , T.pack "    __file__ = _joinpath(a, b)"
+      , T.pack "    return __file__"
       , T.pack $ printf  "project_path = %s" (escape projectPath)
       , doc2Text (bindSExpr "res" sexpr)
-      , T.pack "res = module_code(res, filename=__file__, name=__name__)"
+      , T.pack $ printf "res = module_code(res, filename=__file__, name=%s)" (escape mName)
       ]
 
 loaderCode :: Text

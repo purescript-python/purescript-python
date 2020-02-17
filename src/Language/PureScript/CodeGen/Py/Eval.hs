@@ -153,14 +153,16 @@ finally n = loc $ case n of
              BlockComment x -> x
         in comment (map f cs) (finally exp)
 
-    where
-        loc | Just SourceSpan
-                { spanName=filename
-                , spanStart =
-                    SourcePos
-                    { sourcePosLine=line
-                    , sourcePosColumn=col
-                    }
-                } <- getSourceSpan n =
-                    located (SourceLoc {line, col, filename})
-            | otherwise = id
+    where loc | Just loc <- getSourceSpan n = located $ takeSourceLoc loc
+              | otherwise = id
+
+takeSourceLoc
+    SourceSpan
+        { spanName=filename
+        , spanStart =
+            SourcePos
+            { sourcePosLine=line
+            , sourcePosColumn=col
+            }
+        }
+     = SourceLoc {line, col, filename}

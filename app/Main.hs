@@ -1,7 +1,7 @@
 module Main where
 import System.Exit
 import System.Environment
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import System.FilePath ((</>), joinPath, takeFileName)
 
 import Text.Printf (printf)
@@ -46,7 +46,7 @@ import Control.Monad.Reader (MonadReader(..))
 import qualified Control.Monad.State as State
 
 import Monads.STEither
-    
+
 instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither State.get
     local r m = m
@@ -67,6 +67,7 @@ main = do
 
 cg :: FilePath -> FilePath -> FilePath -> IO ()
 cg foreignBaseDir baseOutDir jsonFile = do
+  pwd      <- getCurrentDirectory
   jsonText <- T.decodeUtf8 <$> B.readFile jsonFile
   let module' = jsonToModule $ parseJson jsonText
       mn      = moduleName module'
@@ -76,7 +77,7 @@ cg foreignBaseDir baseOutDir jsonFile = do
       Left e -> print (e :: MultipleErrors) >> exitFailure
       Right (((hasForeign, ast), _), _) -> do
         let
-            implCode = legalizedCodeGen (finally ast)
+            implCode = legalizedCodeGen pwd (finally ast)
             outDir = runToModulePath baseOutDir mn
             ffiDir = runToModulePath foreignBaseDir mn
             entryPath = outDir </> "__init__.py"
@@ -113,12 +114,14 @@ jsonToModule value =
 doc2Text :: Doc ann -> T.Text
 doc2Text = renderStrict . layoutPretty defaultLayoutOptions
 
-legalizedCodeGen :: Doc Py -> Text
-legalizedCodeGen sexpr =
+legalizedCodeGen :: FilePath -> Doc Py -> Text
+legalizedCodeGen projectPath sexpr =
     T.unlines
       [
         T.pack "from py_sexpr.terms import *"
       , T.pack "from py_sexpr.stack_vm.emit import module_code"
+      , T.pack "from os.path import join as joinpath"
+      , T.pack $ printf  "project_path = %s" (escape projectPath)
       , doc2Text (bindSExpr "res" sexpr)
       , T.pack "res = module_code(res)"
       ]
@@ -132,4 +135,4 @@ loaderCode =
       , "__ps__ = LoadPureScript(__file__, __name__)"
       , "__all__ = list(__ps__)"
       , "__py__.update(__ps__)"
-      ]      
+      ]

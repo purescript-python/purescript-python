@@ -6,6 +6,8 @@
 module Language.PureScript.CodeGen.Py.Eval where
 
 
+import System.FilePath ((</>))
+
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.Comments (Comment(..))

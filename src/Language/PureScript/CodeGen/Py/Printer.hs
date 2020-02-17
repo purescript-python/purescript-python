@@ -1,7 +1,7 @@
 -- -- required rts:
 -- 1. `zfsr64`, which implements zero_fill_shift_right for 64-bit integers
 -- 2. `Error(msg, self) = Exception(msg)`
--- 3. import_module from importlib (>=Python 3.5)
+-- 3. `import_module` from importlib (>=Python 3.5)
 module Language.PureScript.CodeGen.Py.Printer where
 
 import Language.PureScript.CodeGen.Py.Common
@@ -173,9 +173,10 @@ instance EvalJS (Doc Py) where
     retNoRes    = just "ret(None)"
     throw v     = just "throw" <> align_tupled [v]
     isa inst ty = just "isa"<> align_tupled [inst, ty]
-    comment cs exp = just "document" <> align_tupled [vsep (map (just . escape) cs), exp]
+    comment cs exp = just "document" <> align_tupled [vsep (map (just . escape . T.unpack) cs), exp]
     located SourceLoc {line, col, filename} term =
-        just "metadata" <> align_tupled [pretty line, pretty col, just $ escape filename, term]
+        let fullpath = just "joinpath" <> tupled [just "project_path", just $ escape filename]
+        in just "metadata" <> align_tupled [pretty line, pretty col, fullpath , term]
 
 bindSExpr :: String -> Doc Py -> Doc Py
 bindSExpr name sexpr = just name <+> just "=" <+> sexpr

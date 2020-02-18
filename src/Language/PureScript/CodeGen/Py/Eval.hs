@@ -48,6 +48,7 @@ class EvalJS repr where
     new     :: repr -> [repr] -> repr -- create class
     block   :: [repr] -> repr
     var     :: BoxedName -> repr
+    intro   :: BoxedName -> repr -> repr
     assign  :: BoxedName -> repr -> repr
 
     while    :: repr -> repr -> repr
@@ -119,10 +120,10 @@ finally n = loc $ case n of
     Block _ xs -> block $ map finally xs
 
     VariableIntroduction _ n Nothing ->
-        assign (mkName n) none
+        intro (mkName n) none
 
     VariableIntroduction _ n (Just it) ->
-        assign (mkName n) (finally it)
+        intro (mkName n) (finally it)
 
     While _ cond body ->
         while (finally cond) (finally body)

@@ -163,6 +163,7 @@ instance EvalJS (Doc Py) where
     var This      = just "this"
     var Import    = just "var('import_module')"
     assign (Unbox n) v = just "assign" <> align_tupled [just n, v]
+    intro (Unbox n) v  = just "assign_star" <> align_tupled [just n, v]
     while cond body    = just "loop"   <> align_tupled [cond, body]
     upRecord old new   = just "lens"   <> align_tupled [old, new]
 

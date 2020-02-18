@@ -47,12 +47,12 @@ applyAs a l r = case a of
     AsCall f -> just "call" <> align_tupled [l, r]
     AsBin op -> just "binop" <> align_tupled
             [ l
-            , viaShow ("BinOp." <> op)
+            , just ("BinOp." <> op)
             , r
             ]
     AsCmp op -> just "cmp" <> align_tupled
             [ l
-            , viaShow ("Compare." <> op)
+            , just ("Compare." <> op)
             , r
             ]
 
@@ -85,7 +85,7 @@ instance EvalJS (Doc Py) where
             | BitwiseNot <- op = "UOp.INVERT"
             | Positive <- op = "UOp.POSITIVE"
             | otherwise = error "impossible unary operator"
-        in  just "uop" <>  align_tupled [just $ escape op', e]
+        in  just "uop" <>  align_tupled [just op', e]
 
     binary op l r =
         let

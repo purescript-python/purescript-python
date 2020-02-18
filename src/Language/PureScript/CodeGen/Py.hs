@@ -111,7 +111,8 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     return (hasForeign, AST.Block Nothing $ moduleBody ++ exportObj)
   
   where
-  this     = AST.Var Nothing $ unmangle "this"
+  thisName = unmangle ".this"
+  this     = AST.Var Nothing thisName
   pyimport = AST.Var Nothing $ unmangle "import"
 
   runModuleNameImpl :: Text -> P.ModuleName -> Text
@@ -256,7 +257,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     extendObj obj sts
   valueToJs' e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
     let args = unAbs e
-    in return $ AST.Function Nothing Nothing (map identToPy args) (AST.Block Nothing $ map assign args)
+    in return $ AST.Function Nothing Nothing (map identToPy args ++ [thisName]) (AST.Block Nothing $ map assign args ++ [this])
     where
     unAbs :: Expr Ann -> [Ident]
     unAbs (Abs _ arg val) = arg : unAbs val
@@ -305,7 +306,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
 
   valueToJs' (Constructor _ _ ctor []) =
     return $ AST.Block Nothing
-           [ AST.Function Nothing (Just (properToJs ctor)) [] (AST.Block Nothing [this])
+           [ AST.Function Nothing (Just (properToJs ctor)) [thisName] (AST.Block Nothing [this])
            , AST.Assignment Nothing (accessorString "value" (AST.Var Nothing (properToJs ctor)))
              $ AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) []
            , AST.Var Nothing (properToJs ctor)
@@ -314,7 +315,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   valueToJs' (Constructor _ _ ctor fields) =
     let constructor =
           let body = [ AST.Assignment Nothing ((indexerString $ mkString $ identToPy f) this) (var f) | f <- fields ]
-          in AST.Function Nothing (Just (properToJs ctor)) (identToPy `map` fields) (AST.Block Nothing $ body ++ [AST.Return Nothing this])
+          in AST.Function Nothing (Just (properToJs ctor)) (identToPy `map` fields ++ [thisName]) (AST.Block Nothing $ body ++ [AST.Return Nothing this])
     in return constructor
 
   literalToValueJS :: SourceSpan -> Literal (Expr Ann) -> m AST

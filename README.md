@@ -102,4 +102,3 @@ create a directory `python-ffi` juxtaposing `src`, and it'll finally look like:
     - Mod
         - A.purs
 ```
-

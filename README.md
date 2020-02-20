@@ -8,7 +8,7 @@ Currently we have released `v0.1.0.0`.
 
 1. Installing `pspy-blueprint`
 
-    - Install from GitHub release page: TODO
+    - Install from [GitHub release page](https://github.com/purescript-python/purescript-python/packages).
     - Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
 
 2. \*Installing a CPython distribution.
@@ -81,7 +81,7 @@ For VSCode users, installing the plugin `PureScript IDE` and `File -> Preference
 ## HOW-TO: Using Python FFI files for My PS Projects
 
 For each project,
-if your project directory is
+if your project directory tree is
 
 ```
 - src
@@ -90,7 +90,7 @@ if your project directory is
         - A.purs
 ```
 
-where you have foreign definitions in module `Mod.A`, you need to
+If you have foreign definitions in module `Mod.A`, you need to
 create a directory `python-ffi` juxtaposing `src`, and it'll finally look like:
 
 ```

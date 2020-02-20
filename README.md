@@ -47,20 +47,10 @@ After processing this module via the command
 
 ```shell
 # `output` is the directory produced by the PureScript build tool `spago`.
-pspy --out-top aaa/bbb/output_top_dir --entry-corefn output/A.B/path_to_corefn.json
+pspy-blueprint --out-python aaa/bbb/output_top_dir --corefn-entry A.B --out-ffi-dep ffi-requires.txt
 ```
 
-We read `CoreFn` from `.json` file and know we're generating PureScript module `A.B`, which shall be compiled from a source file whose path matches one of following patterns:
-- source code from current project:
-
-  `PROJECT_DIR/src/**/*.purs`
-
-- source code from dependencies:
-
-  `PROJECT_DIR/.spago/<package-name>/v<version>/src/**.*.purs`
-
-
-Command `pspy` generates following directory tree(all `__init__.py` will be added later, but not in Haskell side):
+Command `pspy-blueprint` generates following directory tree(all `__init__.py` will be added later, but not in Haskell side):
 
 ```
 - aaa/bbb/output_top_dir
@@ -70,9 +60,7 @@ Command `pspy` generates following directory tree(all `__init__.py` will be adde
             - pure.src.py
 
     - ffi
-- .pure-py-ffi
-    - 
-
+- ffi-requires.txt # lines of paths from which FFI files are required
 ```
 
 `pure.src.py` Generated for Each Module

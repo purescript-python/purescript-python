@@ -15,65 +15,106 @@ Then I found PureScript, and now I think I love it.
 
 ## Status
 
-After slightly modifying a JavaScript-like IR produced by the builtin compiler,
-PureScript gets compiled to [`PySExpr`](https://github.com/thautwarm/PySExpr) and shall work since Python 3.5.
-
 The code generation itself is finished, but still needs testing.
 
 Currently I'm working on the support of some FFI libraries, for example, `Prelude`. Without `Prelude`
 we cannot even print anything or proceed testing.
 
+The first binary release(`v0.1`) will be available after
+- passing the testcases provided by PureScript GitHub repository, and
+- implementing an extensible and customizable Python FFI providing mechanism.
 
 ## Python Package Generation Specification
+
+Generating PySExpr
+-------------------------
+
+After slightly modifying a JavaScript-like IR produced by the builtin compiler,
+PureScript gets compiled to [`PySExpr`](https://github.com/thautwarm/PySExpr) and **shall work since Python 3.5**.
+
+The reason why we generate the IR `PySExpr` instead of Python source code,
+is for getting better cross-Python-version compatibility, Python-version-specific optimizations,
+**source code positioning for using existing Python debuggers in PureScript**, and expression-first expressiveness. You could check out [this reddit post](https://www.reddit.com/r/ProgrammingLanguages/comments/f41odv/a_compiler_back_end_by_which_you_write) for more details.
 
 
 Directory Tree of Generated Package
 ---------------------------------------------
 
 
-Given a purescript module `A.B`, not losing the generality, we abbreviate it as `A.B`.
+Given a PureScript module, not losing the generality, we abbreviate it as `A.B`.
 
 After processing this module via the command
 
 ```shell
-# `output` is the directory produced by the purescript build tool `spago`.
-pspy-one-module --foreign-top xxx/yyy/foreign_dir --out-top aaa/bbb/output_top_dir --corefn output/A.B/path_to_corefn.json
+# `output` is the directory produced by the PureScript build tool `spago`.
+pspy --out-top aaa/bbb/output_top_dir --entry-corefn output/A.B/path_to_corefn.json
 ```
 
-We read `CoreFn` from `.json` file and know we're generating purescript module `A.B`.
+We read `CoreFn` from `.json` file and know we're generating PureScript module `A.B`, which shall be compiled from a source file whose path matches one of following patterns:
+- source code from current project:
 
-If `A.B` used FFI directly, the directory tree of finally generated Python package is
+  `PROJECT_DIR/src/**/*.purs`
 
-```
-- aaa/bbb/output_top_dir
-    - A
-        - __init__.py
-        - B
-            - __init__.py
-            - purescript_impl.py
-            - purescript_impl.src.py
-            - purescript_foreign.py
-```
+- source code from dependencies:
 
-where `purescript_foreign.py` is copied from `xxx/yyy/foreign_dir/purescript_foreign/A/B.py`.
+  `PROJECT_DIR/.spago/<package-name>/v<version>/src/**.*.purs`
 
 
-If `A.B` didn't use FFI directly, the directory tree of finally generated Python package is
+Command `pspy` generates following directory tree(all `__init__.py` will be added later, but not in Haskell side):
 
 ```
 - aaa/bbb/output_top_dir
     - A
-        - __init__.py
         - B
-            - __init__.py
-            - purescript_impl.py
-            - purescript_impl.src.py
+            - pure.py
+            - pure.src.py
+
+    - ffi
+    - ffi.json
+
 ```
+
+`pure.src.py` Generated for Each Module
+-----------------------------------------------
+
+This Python module creates Python code/bytecode object.
+
+In CPython, every Python file will be compiled to a Python code object, which will finally be executed in
+CPython virtual machine.
+
+In `pure.src.py`, we just create the code object,
+but don't execute it, for achieving the further flexibility of caching and composition of our compilation.
+
+`pure.py` Generated for Each Module
+----------------------------------------------
+
+This is, actually the loader for corresponding `pure.src.py`.
+
+This module implements the concrete code caching system which avoids the redundant Python source code to bytecode compilation, and finally greatly reduce the module loading time.
+
+Hence, a PureScript module `A.B` compiled by PureScript-Python
+will be able to imported by the statement `import output_top_dir.A.B.pure`.
+
+The code of `pure.py`, corresponding to a PureScript module, is fixed to be
+
+```python
+from purescripto import LoadPureScript
+__py__ = globals()
+__ps__ = LoadPureScript(__file__, __name__)
+__all__ = list(__ps__)
+__py__.update(__ps__)
+```
+
+which relies on the Python package `purescripto`.
+
+The Python package `purescripto` provides a common RTS and supplements all required functionalities for being a full featured PureScript backend.
+
+<!-- 
 
 `purescript_impl.src.py`
 -----------------------------------------
 
-The generated `PySExpr` is in `purescript_impl.src.py`. 
+
 
 <details>
 
@@ -149,4 +190,4 @@ __py__ = globals()
 __ps__ = LoadPureScript(__file__, __name__)
 __all__ = list(__ps__)
 __py__.update(__ps__)
-```
+``` -->

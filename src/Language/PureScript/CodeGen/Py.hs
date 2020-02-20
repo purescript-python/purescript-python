@@ -115,12 +115,12 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   this     = AST.Var Nothing thisName
   pyimport = AST.Var Nothing $ unmangle "import"
 
-  runModuleNameImpl :: Text -> P.ModuleName -> Text
-  runModuleNameImpl suffix (P.ModuleName pns) =
-    T.intercalate "."  ((package : (P.runProperName <$> pns)) ++ [suffix])
+  runModuleNameImpl :: [Text] -> [Text] -> P.ModuleName -> Text
+  runModuleNameImpl prefix suffix (P.ModuleName pns) =
+    T.intercalate "."  (package:prefix ++ (P.runProperName <$> pns) ++ suffix)
   
-  runForeignModuleName = runModuleNameImpl "purescript_foreign"
-  runModuleName        = runModuleNameImpl "purescript_impl"
+  runForeignModuleName = runModuleNameImpl ["ffi"] []
+  runModuleName        = runModuleNameImpl [] ["pure"]
   
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]

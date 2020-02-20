@@ -8,7 +8,7 @@ Currently we have preview released `v0.1.0.0a`.
 
 1. Installing `pspy-blueprint`
 
-    - Install from [GitHub release page](https://github.com/purescript-python/purescript-python/packages).
+    - Install from [GitHub release page](https://github.com/purescript-python/purescript-python/releases).
     - Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
 
 2. \*Installing a CPython distribution.

@@ -1,10 +1,10 @@
 name: purescript-python
 version: 0.1.0.0
-github: "githubuser/purescript-python"
+github: "purescript-python/purescript-python"
 license: BSD3
-author: "Author name here"
-maintainer: "example@example.com"
-copyright: "2020 Author name here"
+author: "Taine Zhao"
+maintainer: "twshere@outlook.com"
+copyright: "2020 Taine Zhao"
 
 extra-source-files:
   - README.md
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description: Please see the README on GitHub at <https://github.com/githubuser/purescript-python#readme>
+description: Please see the README on GitHub at <https://github.com/purescript-python/purescript-python#readme>
 
 dependencies:
   - aeson >=1.0 && <1.5

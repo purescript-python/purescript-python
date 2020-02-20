@@ -2,7 +2,7 @@
 
 For implementation and code generation specification, check [Implementation](./Impl.md).
 
-Currently we have preview released `v0.1.0.0a`.
+Currently we have a preview release `v0.1.0.0a`for trying out.
 
 ## Get Started
 
@@ -42,7 +42,7 @@ Currently we have preview released `v0.1.0.0a`.
 
     **If you're using windows, remember to expand the user directory "~" to "C:\Users\twshe\<username>"**.
 
-5. Create an empty folder called `hello-world` somewhere appropriate, and call
+5. Create an empty folder called `hello-world` somewhere appropriate,get in, and call
    ```
    spago init  # init purescript project
    pspy --init # init purescript-python local configuration

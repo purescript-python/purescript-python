@@ -22,13 +22,14 @@ import qualified Data.ByteString as B
 import qualified Data.Set as S
 
 
-import Language.PureScript.CoreImp.AST (withSourceSpan, getSourceSpan, everywhere)
+import Language.PureScript.CoreImp.AST (AST, withSourceSpan, getSourceSpan, everywhere)
 import qualified Language.PureScript.AST.SourcePos as SP
 
 import Language.PureScript.CoreFn
 import Language.PureScript.CoreFn.FromJSON
 import Language.PureScript.Errors (MultipleErrors)
 import Language.PureScript.Options (Options(..))
+import Language.PureScript.Names (moduleNameFromString)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Hierarchy as P
 
@@ -44,7 +45,7 @@ import Control.Monad.Supply.Class
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 import Data.Text.Prettyprint.Doc (Doc, layoutPretty, defaultLayoutOptions)
 
-import Control.Monad (when)
+import Control.Monad (forM)
 import Control.Monad.Reader (MonadReader(..))
 import qualified Control.Monad.State as State
 
@@ -65,29 +66,47 @@ main :: IO ()
 main = do
     opts <- getArgs
     case opts of
-        ["--out-top", baseOutDir, "--entry-corefn", jsonFile] ->
-            cg baseOutDir jsonFile
-        _ ->  putStrLn "Malformed options, expect form --foreign-top <dir0> --out-top <dir1> --corefn <xxx.json>." >> exitFailure
+        [ "--out-python"
+         , baseOutDir
+         , "--corefn-entry"
+         , moduleParts
+         , "--out-ffi-dep"
+         , ffiDepPath] -> do
+            ffiDeps <-
+              fixPointCG
+                baseOutDir
+                S.empty
+                (S.empty, [moduleNameFromString $ T.pack moduleParts])
+            T.writeFile ffiDepPath (T.unlines $ map T.pack ffiDeps)
+        _ ->  putStrLn "Malformed options, expect form --out-python <dir0> --corefn-entry <A.B.C> --out-ffi-dep <xxx>." >> exitFailure
 
 
-data Dependency
-  = Dependency {
-    getLibrary :: String
-  , getVersion :: [Int]
-  }
-
-data ModuleSource
-    = ModuleSource {
-      getSource :: FilePath
-    -- Nothing if this module is from current project
-    , asDep     :: Maybe Dependency
-    }
-
+fixPointCG :: FilePath -> S.Set FilePath -> (S.Set P.ModuleName, [P.ModuleName]) -> IO [FilePath]
+fixPointCG baseOutDir ffiPathReferred (importedModules, moduleImportDeque) =
+  case moduleImportDeque of
+    [] -> return $ S.toList ffiPathReferred
+    m:ms
+     | m `S.member` importedModules ->
+       fixPointCG baseOutDir ffiPathReferred (importedModules, ms)
+     | otherwise -> do
+       (newModsToImport, newFFIReferred) <- cg baseOutDir m
+       fixPointCG
+        baseOutDir
+        (S.union ffiPathReferred newFFIReferred)
+        (S.insert m importedModules, newModsToImport ++ ms)
 
 -- code generation for each  module
-cg :: FilePath -> FilePath -> FilePath -> IO ()
-cg foreignBaseDir baseOutDir jsonFile = do
+cg :: FilePath -> P.ModuleName -> IO ([P.ModuleName], S.Set FilePath)
+cg baseOutDir coreFnMN = do
   pwd      <- getCurrentDirectory
+  -- TODO: customizable `output` directory
+  let jsonFile = joinPath
+        [ pwd
+        , "output"
+        , runModuleName [] [] coreFnMN
+        , "corefn.json"
+        ]
+
   jsonText <- T.decodeUtf8 <$> B.readFile jsonFile
   let module' = jsonToModule $ parseJson jsonText
       -- getting the module name
@@ -98,34 +117,40 @@ cg foreignBaseDir baseOutDir jsonFile = do
       mspan   = takeSourceLoc (moduleSourceSpan module')
       -- name of the generated python package
       package = takeFileName baseOutDir
+  
   case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
         moduleToJS module' (T.pack package) of
       Left e -> print (e :: MultipleErrors) >> exitFailure
       Right (((hasForeign, ast), _), _) -> do
-        let
-            implCode =
+        let implCode =
                 legalizedCodeGen
-                  (runModuleName package mn)
+                  (runModuleName [package] ["pure"] mn)
                   (joinPath [pwd, mp])
-                  (finally $ astSSToAbsPath ast)
+                  (finally $ astSSToAbsPath pwd ast)
 
-            outDir = runToModulePath baseOutDir mn
+            outDir = runToModulePath [pwd, baseOutDir] [] mn
             implSrcPath = outDir </> "pure.src.py"
             implLoaderPath = outDir </> "pure.py"
 
         createDirectoryIfMissing True outDir
         T.writeFile implSrcPath implCode
         T.writeFile implLoaderPath loaderCode
+  
+  let newModsToImport = map snd (moduleImports module')
+  let newFModToAdd = S.fromList [mp | not $ List.null (moduleForeign module')]
+  return (newModsToImport, newFModToAdd)
 
-runToModulePath ::  FilePath -> P.ModuleName -> String
-runToModulePath base (P.ModuleName pns) =
+runToModulePath ::  [FilePath] -> [FilePath] -> P.ModuleName -> String
+runToModulePath prefix suffix (P.ModuleName pns) =
         joinPath .
-        (base:) . (++ ["pure"]) . map T.unpack $ (P.runProperName <$> pns)
+        (prefix++) . (++suffix) .
+        map T.unpack $ (P.runProperName <$> pns)
 
-runModuleName ::  FilePath -> P.ModuleName -> String
-runModuleName base (P.ModuleName pns) =
+runModuleName ::  [FilePath] -> [FilePath] -> P.ModuleName -> String
+runModuleName prefix suffix (P.ModuleName pns) =
         List.intercalate "." .
-        (base:) . (++["pure"]) . map T.unpack $ (P.runProperName <$> pns)
+        (prefix++) . (++suffix) .
+        map T.unpack $ (P.runProperName <$> pns)
 
 parseJson :: Text -> Value
 parseJson text

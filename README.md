@@ -70,7 +70,8 @@ Command `pspy` generates following directory tree(all `__init__.py` will be adde
             - pure.src.py
 
     - ffi
-    - ffi.json
+- .pure-py-ffi
+    - 
 
 ```
 

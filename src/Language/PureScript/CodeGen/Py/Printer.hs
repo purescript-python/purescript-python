@@ -176,8 +176,7 @@ instance EvalJS (Doc Py) where
     isa inst ty = just "isa"<> align_tupled [inst, ty]
     comment cs exp = just "document" <> align_tupled [vsep (map (just . escape . T.unpack) cs), exp]
     located SourceLoc {line, col, filename} term =
-        let fullpath = just "joinpath" <> tupled [just "project_path", just $ escape filename]
-        in just "metadata" <> align_tupled [pretty line, pretty col, fullpath , term]
+        just "metadata" <> align_tupled [pretty line, pretty col, just (escape filename) , term]
 
 bindSExpr :: String -> Doc Py -> Doc Py
 bindSExpr name sexpr = just name <+> just "=" <+> sexpr

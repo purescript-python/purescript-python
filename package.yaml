@@ -104,7 +104,7 @@ default-extensions:
   - TupleSections
 
 executables:
-  pspy-one-module:
+  pspy-blueprint:
     main: Main.hs
     source-dirs: app
     ghc-options:

@@ -22,16 +22,21 @@ import qualified Data.ByteString as B
 import qualified Data.Set as S
 
 
-import Language.PureScript.CoreImp.AST (AST, withSourceSpan, getSourceSpan, everywhere)
 import qualified Language.PureScript.AST.SourcePos as SP
+import Language.PureScript.CoreImp.AST ( AST
+                                       , withSourceSpan
+                                       , getSourceSpan
+                                       , everywhere
+                                       )
 
 import Language.PureScript.CoreFn
 import Language.PureScript.CoreFn.FromJSON
 import Language.PureScript.Errors (MultipleErrors)
 import Language.PureScript.Options (Options(..))
-import Language.PureScript.Names (moduleNameFromString)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Hierarchy as P
+import Language.PureScript.Names ( moduleNameFromString
+                                 , isBuiltinModuleName )
 
 
 import Language.PureScript.CodeGen.Py (moduleToJS)
@@ -86,7 +91,7 @@ fixPointCG baseOutDir ffiPathReferred (importedModules, moduleImportDeque) =
   case moduleImportDeque of
     [] -> return $ S.toList ffiPathReferred
     m:ms
-     | m `S.member` importedModules ->
+     | m `S.member` importedModules || isBuiltinModuleName m ->
        fixPointCG baseOutDir ffiPathReferred (importedModules, ms)
      | otherwise -> do
        (newModsToImport, newFFIReferred) <- cg baseOutDir m

@@ -2,7 +2,7 @@
 
 For implementation and code generation specification, check [Implementation](./Impl.md).
 
-Currently we have released `v0.1.0.0`.
+Currently we have preview released `v0.1.0.0a`.
 
 ## Get Started
 

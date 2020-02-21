@@ -23,52 +23,22 @@ dependencies:
   - aeson >=1.0 && <1.5
   - aeson-better-errors >=0.8
   - aeson-pretty
-  - array
   - base >=4.11 && <4.13
   - base-compat >=0.6.0
-  - blaze-html >=0.8.1 && <0.10
-  - bower-json >=1.0.0.1 && <1.1
-  - boxes >=0.1.4 && <0.2.0
   - bytestring
-  - cheapskate >=0.1 && <0.2
-  - clock
   - containers
-  - cryptonite >=0.25
-  - deepseq
   - directory >=1.2.3
-  - dlist
-  - file-embed
   - filepath
-  - fsnotify >=0.2.1
-  - Glob >=0.9 && <0.10
-  - language-javascript >=0.7.0.0
-  - memory >=0.14 && <0.15
-  - microlens-platform >=0.3.9.0 && <0.4
   - monad-control >=1.0.0.0 && <1.1
   - monad-logger >=0.3 && <0.4
   - mtl >=2.1.0 && <2.3.0
-  - parallel >=3.2 && <3.3
-  - pattern-arrows >=0.0.2 && <0.1
-  - process >=1.2.0 && <1.7
   - protolude >=0.1.6 && <0.2.4
-  - safe >=0.3.9 && <0.4
-  - scientific >=0.3.4.9 && <0.4
   - semigroups >=0.16.2 && <0.19
-  - semialign >=1 && <1.1
-  - sourcemap >=0.1.6
-  - split
-  - stm >=0.2.4.0
-  - stringsearch
-  - syb
   - text
-  - these >= 1 && <1.1
-  - time
   - transformers >=0.3.0 && <0.6
   - transformers-base >=0.4.0 && <0.5
   - transformers-compat >=0.3.0
-  - unordered-containers
   - utf8-string >=1 && <2
-  - vector
   - purescript
   - prettyprinter
 
@@ -100,35 +70,26 @@ default-extensions:
   - ScopedTypeVariables
   - TupleSections
 
+ghc-options: -Wall -O2 -static
+cc-options: -static
+ld-options:
+- -static
+- -pthread
+- -Wall
+
 library:
   source-dirs: src
-  ghc-options:
-  - -Wall
-  - -O2
 
 executables:
   pspy-blueprint:
     main: Main.hs
     source-dirs: app
-    ghc-options:
-      - -threaded
-      - -Wall
-      - -O2
-#    cc-options: -static
-    ld-options: -Wl,-rpath -Wl,$ORIGIN/linuxlibs
-#    - -static
-#    - -pthread
-#    - -Wl
     dependencies:
       - purescript-python
 
-tests:
-  purescript-python-test:
-    main: Spec.hs
-    source-dirs: test
-    ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-    dependencies:
-      - purescript-python
+#tests:
+#  purescript-python-test:
+#    main: Spec.hs
+#    source-dirs: test
+#    dependencies:
+#      - purescript-python

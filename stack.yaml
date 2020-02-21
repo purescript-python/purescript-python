@@ -1,12 +1,18 @@
-resolver: lts-13.12
+resolver: lts-13.26
+pvp-bounds: upper
 packages:
-- .
-
+- '.'
 extra-deps:
-- purescript-0.13.6
+- github: purescript/purescript
+  commit: ed130c78b708ff55cf4a80b126a1bd3ba5d80eb9
 - happy-1.19.9
 - language-javascript-0.7.0.0
 - network-3.0.1.1
 - these-1.0.1
 - semialign-1
-- assoc-1.0.1
+flags:
+  aeson-pretty:
+    lib-only: true
+  these:
+    assoc: false
+    quickcheck: false

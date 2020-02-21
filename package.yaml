@@ -72,9 +72,6 @@ dependencies:
   - purescript
   - prettyprinter
 
-library:
-  source-dirs: src
-
 default-extensions:
   - ViewPatterns
   - DeriveGeneric
@@ -103,14 +100,25 @@ default-extensions:
   - ScopedTypeVariables
   - TupleSections
 
+library:
+  source-dirs: src
+  ghc-options:
+  - -Wall
+  - -O2
+
 executables:
   pspy-blueprint:
     main: Main.hs
     source-dirs: app
     ghc-options:
       - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
+      - -Wall
+      - -O2
+#    cc-options: -static
+    ld-options: -Wl,-rpath -Wl,$ORIGIN/linuxlibs
+#    - -static
+#    - -pthread
+#    - -Wl
     dependencies:
       - purescript-python
 

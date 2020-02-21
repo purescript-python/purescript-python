@@ -12,6 +12,8 @@ exe_name = "pspy-blueprint"
 out_dir = "linux-libs"
 
 Path(out_dir).mkdir(exist_ok=True)
+copy_tree("licenses", out_dir)
+
 check_call(['stack', 'build'])
 
 

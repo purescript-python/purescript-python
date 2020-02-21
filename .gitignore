@@ -2,7 +2,7 @@
 purescript-python.cabal
 *~
 
-# for making statically built libs
-linuxlibs/
-pspy-blueprint-*.zip
 stack.yaml.lock
+
+# for making statically built libs
+pspy-blueprint-*.zip

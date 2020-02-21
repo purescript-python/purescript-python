@@ -2,16 +2,16 @@ module Main where
 import System.Exit
 import System.Environment
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
-import System.FilePath ((</>), joinPath, takeFileName, splitDirectories)
+import System.FilePath ((</>), joinPath, takeFileName)
 
 import Text.Printf (printf)
-import qualified Data.Map as M
 
 import Data.Aeson hiding (Options)
 import Data.Aeson.Types hiding (Options)
-import Data.Text (Text, pack, unpack)
 
 import qualified Data.List as List
+
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
@@ -34,23 +34,20 @@ import Language.PureScript.CoreFn.FromJSON
 import Language.PureScript.Errors (MultipleErrors)
 import Language.PureScript.Options (Options(..))
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Hierarchy as P
 import Language.PureScript.Names ( moduleNameFromString
                                  , isBuiltinModuleName )
 
 
 import Language.PureScript.CodeGen.Py (moduleToJS)
 import Language.PureScript.CodeGen.Py.Printer (Py, bindSExpr)
-import Language.PureScript.CodeGen.Py.Eval (finally, takeSourceLoc)
-import Language.PureScript.CodeGen.Py.Common (escape, SourceLoc(..))
+import Language.PureScript.CodeGen.Py.Eval (finally)
+import Language.PureScript.CodeGen.Py.Common (escape)
 
 import Control.Monad.Supply
-import Control.Monad.Supply.Class
 
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 import Data.Text.Prettyprint.Doc (Doc, layoutPretty, defaultLayoutOptions)
 
-import Control.Monad (forM)
 import Control.Monad.Reader (MonadReader(..))
 import qualified Control.Monad.State as State
 
@@ -59,8 +56,10 @@ import Monads.STEither
 instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither State.get
     -- TODO: implement a correct `local`
-    local r m = m
+    local r (STEither m) = STEither (State.modify r >> m)
 
+
+defaultOpts :: Options
 defaultOpts =
     Options { optionsVerboseErrors = True
             , optionsNoComments = False
@@ -118,12 +117,9 @@ cg baseOutDir coreFnMN = do
       mn      = moduleName module'
       -- getting the module path
       mp      = modulePath module'
-      -- getting metadata of the module
-      mspan   = takeSourceLoc (moduleSourceSpan module')
       -- name of the generated python package
       package = takeFileName baseOutDir
-  
-  case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
+  hasForeign <- case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
         moduleToJS module' (T.pack package) of
       Left e -> print (e :: MultipleErrors) >> exitFailure
       Right (((hasForeign, ast), _), _) -> do
@@ -131,7 +127,7 @@ cg baseOutDir coreFnMN = do
                 legalizedCodeGen
                   (runModuleName [package] ["pure"] mn)
                   (joinPath [pwd, mp])
-                  (finally $ astSSToAbsPath pwd ast)
+                  (finally $ everywhere (astSSToAbsPath pwd) ast)
 
             outDir = runToModulePath [pwd, baseOutDir] [] mn
             implSrcPath = outDir </> "pure.src.py"
@@ -140,9 +136,10 @@ cg baseOutDir coreFnMN = do
         createDirectoryIfMissing True outDir
         T.writeFile implSrcPath implCode
         T.writeFile implLoaderPath loaderCode
+        return hasForeign
   
   let newModsToImport = map snd (moduleImports module')
-  let newFModToAdd = S.fromList [mp | not $ List.null (moduleForeign module')]
+  let newFModToAdd = S.fromList [mp | hasForeign]
   return (newModsToImport, newFModToAdd)
 
 runToModulePath ::  [FilePath] -> [FilePath] -> P.ModuleName -> String

@@ -2,13 +2,14 @@
 NOTE: This packaging script tested only on Arch/Manjaro Linux.
 """
 from subprocess import check_output, check_call
+from distutils.dir_util import copy_tree
 from pprint import pprint
 from pathlib import Path
 import re
 import os
 
 exe_name = "pspy-blueprint"
-out_dir = "linuxlibs"
+out_dir = "linux-libs"
 
 Path(out_dir).mkdir(exist_ok=True)
 check_call(['stack', 'build'])
@@ -45,5 +46,6 @@ copy_file(
 )
 
 
-os.chdir("linuxlibs")
+os.chdir(out_dir)
 check_call(["chrpath", "-r", "./", exe_name])
+copy_tree("./licenses", out_dir)

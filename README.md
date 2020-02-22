@@ -1,3 +1,4 @@
+
 # PureScript Python
 
 For implementation and code generation specification, check [Implementation](./Impl.md).
@@ -7,6 +8,9 @@ For implementation and code generation specification, check [Implementation](./I
 [This document](./Calling-PS-From-Python.md) is about **how to call your PureScript project from Python**.
 
 Accurately, how to use Python code to call the Python package generated from your purescript project.
+
+If you want, we could discuss questions, or interesting stuffs related to Python/PureScript/Static Typing, at this Gitter Room [![gitter room](https://img.shields.io/badge/chat-Tagful&nbsp;Initial-Green.svg?style=flat)](https://gitter.im/reliable-python/community).
+
 
 
 ## Get Started

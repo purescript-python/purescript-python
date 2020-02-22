@@ -2,6 +2,8 @@
 
 For implementation and code generation specification, check [Implementation](./Impl.md).
 
+[This](https://github.com/purescript-python/example-hw) is the structure of a minimal PureScript-Python project, for previewing.
+
 ## Get Started
 
 1. \*Installing a CPython distribution.

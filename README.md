@@ -4,7 +4,6 @@ For implementation and code generation specification, check [Implementation](./I
 
 ## Get Started
 
-
 1. \*Installing a CPython distribution.
 
     If you're already a user of CPython, you can skip this step.
@@ -25,19 +24,6 @@ For implementation and code generation specification, check [Implementation](./I
    pip3 install -U purescripto
    ```
 
-3. \*Installing `pspy-blueprint`
-
-    If `purescripto` didn't provide your an executable `pspy-blueprint`,
-    you should manually install it from this repository:
-
-    - Install from [GitHub release page](https://github.com/purescript-python/purescript-python/releases).
-    - Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
-
-    For Linux users, you might also need to use `chmod u+x <path/to/pspy-blueprint>` to allow the permission to execute.
-
-    P.S: Looking for contributors to make MacOS releases.
-
-
 4. Installing [nodejs](https://nodejs.org/en/), which is distributed with a command `npm`, and use `npm` to install `purescript` and its package manager `spago`:
    ```bash
    npm install -g purescript
@@ -45,17 +31,17 @@ For implementation and code generation specification, check [Implementation](./I
    ```
    You might check [PureScript: Getting Started](https://github.com/purescript/documentation/blob/master/guides/Getting-Started.md) for more details.
 
-4. `git clone https://github.com/purescript-python/purescript-python-ffi-index ~/.pspy/mirrors/default`.
+5. `git clone https://github.com/purescript-python/purescript-python-ffi-index ~/.pspy/mirrors/default`.
 
     **If you're using windows, remember to expand the user directory "~" to "C:\Users\twshe\<username>"**.
 
-5. Create an empty folder called `hello-world` somewhere appropriate,get in, and call
+6. Create an empty folder called `hello-world` somewhere appropriate,get in, and call
    ```
    spago init  # init purescript project
    pspy --init # init purescript-python local configuration
    ```
 
-6. Add a key `backend` with value `"pspy"`, to file `spago.dhall` of your `hello-world` project. This is an example:
+7. Add a key `backend` with value `"pspy"`, to file `spago.dhall` of your `hello-world` project. This is an example:
   
    ```dhall
     {-
@@ -70,7 +56,7 @@ For implementation and code generation specification, check [Implementation](./I
     }
    ```
 
-7. Write your code in `src/**.purs`, and use `spago run` to execute your project(the default entry module is `Main`).
+8. Write your code in `src/**.purs`, and use `spago run` to execute your project(the default entry module is `Main`).
 
 
 ## PureScript Learning Materials
@@ -78,6 +64,7 @@ For implementation and code generation specification, check [Implementation](./I
 PureScript is close to Haskell, hence a Haskell user can pick it up in few seconds.
 
 The home of PureScript is [PureScript.org](http://www.purescript.org/), where you can find things involving documentations.
+
 
 ## HOW-TO: IDE Support
 
@@ -126,3 +113,13 @@ alternative libraries([integer-simple](https://hackage.haskell.org/package/integ
 Fortunately, **`purescript-python` is just a compiler**, which actually means you don't need to statically link to it.
 
 Similar cases are other LGPL compilers/transpilers, like `gcc`/`pandoc`. We know they didn't trouble us in terms of their licenses, so `purescript-python` would not as well.
+
+
+## Troubleshot `pspy-blueprint`
+
+If `pspy-blueprint` provided by the Python package `purescripto` didn't work(e.g., users of MacOSX < 10.15), you should manually install it from this repository, and currently there're 2 options:
+
+1. Install from [GitHub release page](https://github.com/purescript-python/purescript-python/releases).
+2. Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
+
+For Linux users, you might also need to use `chmod u+x <path/to/pspy-blueprint>` to allow the permission to execute.

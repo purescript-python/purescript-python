@@ -1,7 +1,7 @@
 name: purescript-python
 version: 0.1.0.0
 github: "purescript-python/purescript-python"
-license: BSD3
+license: LGPL-3
 author: "Taine Zhao"
 maintainer: "twshere@outlook.com"
 copyright: "2020 Taine Zhao"

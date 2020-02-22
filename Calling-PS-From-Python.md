@@ -47,10 +47,8 @@ assert f(1)(2) == 3
 Object Representation
 -----------------------------------
 
-- Record: `{a: 1, b: 2}`, in Python it's `{"a": 1, "b": 2}`.
-- Newtype : For `newtype A = A Int`, `A 1` in Python is just `1`.
-- Datatype(Algebraic data types): `data S = S1 Int Number | S2 Text`, `[S1 1 2.0, S2 "hello!"]` in Python is `[{"value0": 1, "value1": 2.0, ".t": <function S1>}, {"value0": "hello!", ".t": S2}].
-`
-
-```
-```
+| Kind     | Given Definition                   | PureScript                | Python                                                                                |
+|----------|------------------------------------|---------------------------|---------------------------------------------------------------------------------------|
+| Datatype | `data S = S1 Int Number | S2 Text` | `[S1 1 2.0, S2 "hello!"]` | `[{"value0": 1, "value1": 2.0, ".t": S1}, {"value0": "hello!", ".t": S2}]` |
+| Newtype  | `newtype A = A Int`                | `A 1`                     | `1`                                                                                   |
+| Record   | No definition                      | `{a: 1, b: 2}`            | `{"a": 1, "b": 2}`                                                                    |

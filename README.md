@@ -4,7 +4,9 @@ For implementation and code generation specification, check [Implementation](./I
 
 [This](https://github.com/purescript-python/example-hw) is the structure of a minimal PureScript-Python project, for previewing.
 
-[This document](./Calling-PS-From-Python.md) is about **how to call your PureScript project from Python**. Accurately, how to use Python code to call the generated Python package from your purescript project.
+[This document](./Calling-PS-From-Python.md) is about **how to call your PureScript project from Python**.
+
+Accurately, how to use Python code to call the Python package generated from your purescript project.
 
 
 ## Get Started

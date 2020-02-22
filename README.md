@@ -33,6 +33,10 @@ For implementation and code generation specification, check [Implementation](./I
     - Install from [GitHub release page](https://github.com/purescript-python/purescript-python/releases).
     - Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
 
+    For Linux users, you might also need to use `chmod u+x <path/to/pspy-blueprint>` to allow the permission to execute.
+
+    P.S: Looking for contributors to make MacOS releases.
+
 
 4. Installing [nodejs](https://nodejs.org/en/), which is distributed with a command `npm`, and use `npm` to install `purescript` and its package manager `spago`:
    ```bash

@@ -49,6 +49,6 @@ Object Representation
 
 | Kind     | Given Definition                   | PureScript                | Python                                                                                |
 |----------|------------------------------------|---------------------------|---------------------------------------------------------------------------------------|
-| Datatype | `data S = S1 Int Number | S2 Text` | `[S1 1 2.0, S2 "hello!"]` | `[{"value0": 1, "value1": 2.0, ".t": S1}, {"value0": "hello!", ".t": S2}]` |
+| Datatype | `data S = S1 Int Number \| S2 Text` | `[S1 1 2.0, S2 "hello!"]` | `[{"value0": 1, "value1": 2.0, ".t": S1}, {"value0": "hello!", ".t": S2}]` |
 | Newtype  | `newtype A = A Int`                | `A 1`                     | `1`                                                                                   |
 | Record   | No definition                      | `{a: 1, b: 2}`            | `{"a": 1, "b": 2}`                                                                    |

@@ -2,23 +2,17 @@
 
 For implementation and code generation specification, check [Implementation](./Impl.md).
 
-Currently we have a preview release `v0.1.0.0a`for trying out.
-
 ## Get Started
 
-1. Installing `pspy-blueprint`
 
-    - Install from [GitHub release page](https://github.com/purescript-python/purescript-python/releases).
-    - Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
-
-2. \*Installing a CPython distribution.
+1. \*Installing a CPython distribution.
 
     If you're already a user of CPython, you can skip this step.
     
     Otherwise, go to [this official download](https://www.python.org/downloads/) page,
     download and install any valid distribution(`>=3.5`).
 
-3. Installing the Python package `purescripto`, which will provide you the command `pspy`.
+2. Installing the Python package `purescripto`, which will provide you the command `pspy`.
 
    Possible commands for installing can be:
 
@@ -30,6 +24,15 @@ Currently we have a preview release `v0.1.0.0a`for trying out.
    # if `pip3` is the correct command to install pkgs to Python3
    pip3 install -U purescripto
    ```
+
+3. \*Installing `pspy-blueprint`
+
+    If `purescripto` didn't provide your an executable `pspy-blueprint`,
+    you should manually install it from this repository:
+
+    - Install from [GitHub release page](https://github.com/purescript-python/purescript-python/releases).
+    - Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
+
 
 4. Installing [nodejs](https://nodejs.org/en/), which is distributed with a command `npm`, and use `npm` to install `purescript` and its package manager `spago`:
    ```bash

@@ -55,7 +55,6 @@ import Monads.STEither
 
 instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither State.get
-    -- TODO: implement a correct `local`
     local r (STEither m) = STEither (State.modify r >> m)
 
 

@@ -9,7 +9,9 @@ For implementation and code generation specification, check [Implementation](./I
 
 Accurately, how to use Python code to call the Python package generated from your purescript project.
 
-If you want, we could discuss questions, or interesting stuffs related to Python/PureScript/Static Typing, at this Gitter Room [![gitter room](https://img.shields.io/badge/chat-Tagful&nbsp;Initial-Green.svg?style=flat)](https://gitter.im/reliable-python/community).
+If you want, we could discuss questions, or interesting stuffs related to Python/PureScript/Static Typing.
+
+At this Gitter Room [![gitter room](https://img.shields.io/badge/chat-Tagful&nbsp;Initial-Green.svg?style=flat)](https://gitter.im/reliable-python/community).
 
 
 

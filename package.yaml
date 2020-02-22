@@ -70,12 +70,22 @@ default-extensions:
   - ScopedTypeVariables
   - TupleSections
 
-ghc-options: -Wall -O2 -static
-cc-options: -static
-ld-options:
-- -static
-- -pthread
-- -Wall
+when:
+  - condition: os(darwin)
+    then:
+      ghc-options: -Wall -O2
+      ld-options:
+      - -pthread
+      - -Wall
+    else:
+      ghc-options: -Wall -O2 -static
+      cc-options: -static
+      ld-options:
+      - -static
+      - -pthread
+      - -Wall
+
+
 
 library:
   source-dirs: src

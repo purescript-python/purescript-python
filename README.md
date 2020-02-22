@@ -102,3 +102,19 @@ create a directory `python-ffi` juxtaposing `src`, and it'll finally look like:
     - Mod
         - A.purs
 ```
+
+## LICENSE
+
+It's now under GNU LESSER GENERAL PUBLIC LICENSE.
+
+There're some reasons for why I have to choose this:
+
+To make releases more user-friendly, the purescript-python compiler is now distributing in the form of static-linked binaries, which could run perfectly in each Linux distribution.
+
+However, to achieve this, a Linux binary distribution have to statically link to some essential Haskell dependencies like [integer-GMP](https://hackage.haskell.org/package/integer-gmp) and [glibc](https://www.gnu.org/software/libc), and they're under LGPL.
+
+Hence, we cannot avoid LGPL trivially as the development of
+alternative libraries([integer-simple](https://hackage.haskell.org/package/integer-simple) or [musl/uClibc](https://github.com/redneb/ghc-alt-libc)) are either suspended or WIP. So we change LICENSE to LGPL.
+
+Fortunately, **`purescript-python` is a compiler**, which means you actually don't need to statically link it.
+Similar cases are other LGPL compilers/transpilers, like `gcc`/`pandoc`. We know they didn't trouble us in terms of their licenses, so `purescript-python` would not as well.

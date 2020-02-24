@@ -17,44 +17,32 @@ At this Gitter Room [![gitter room](https://img.shields.io/badge/chat-Tagful&nbs
 
 ## Get Started
 
-1. \*Installing a CPython distribution.
+0. \*Install a CPython distribution.
 
     If you're already a user of CPython, you can skip this step.
     
     Otherwise, go to [this official download](https://www.python.org/downloads/) page,
     download and install any valid distribution(`>=3.5`).
 
-2. Installing the Python package `purescripto`, which will provide you the command `pspy`.
 
-   Possible commands for installing can be:
-
-   ```bash
-   # if `pip` is in PATH
-   pip install -U purescripto
-   # if `python` is in PATH
-   python -m pip install -U purescripto
-   # if `pip3` is the correct command to install pkgs to Python3
-   pip3 install -U purescripto
-   ```
-
-4. Installing [nodejs](https://nodejs.org/en/), which is distributed with a command `npm`, and use `npm` to install `purescript` and its package manager `spago`:
+1. Install [nodejs](https://nodejs.org/en/), which is distributed with a command `npm`, and use `npm` to install `purescript` and its package manager `spago`:
    ```bash
    npm install -g purescript
    npm install -g spago
    ```
    You might check [PureScript: Getting Started](https://github.com/purescript/documentation/blob/master/guides/Getting-Started.md) for more details.
 
-5. `git clone https://github.com/purescript-python/purescript-python-ffi-index ~/.pspy/mirrors/default`.
+2. Install PureScript-Python components:
 
-    **If you're using windows, remember to expand the user directory "~" to "C:\Users\twshe\<username>"**.
+   `pip install git+https://github.com/purescript-python/installer`
 
-6. Create an empty folder called `hello-world` somewhere appropriate,get in, and call
+3. Create an empty folder called `hello-world` somewhere appropriate,get in, and call
    ```
    spago init  # init purescript project
    pspy --init # init purescript-python local configuration
    ```
 
-7. Add a key `backend` with value `"pspy"`, to file `spago.dhall` of your `hello-world` project. This is an example:
+4. Add a key `backend` with value `"pspy"`, to file `spago.dhall` of your `hello-world` project. This is an example:
   
    ```dhall
     {-
@@ -69,7 +57,7 @@ At this Gitter Room [![gitter room](https://img.shields.io/badge/chat-Tagful&nbs
     }
    ```
 
-8. Write your code in `src/**.purs`, and use `spago run` to execute your project(the default entry module is `Main`).
+5. Write your code in `src/**.purs`, and use `spago run` to execute your project(the default entry module is `Main`).
 
 
 ## PureScript Learning Materials

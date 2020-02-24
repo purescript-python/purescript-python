@@ -80,3 +80,6 @@ deploy:
   file: $ZIP_FILE
   skip_cleanup: true
   draft: true
+
+after_deploy:
+  - ./pspy-blueprint || echo "done"

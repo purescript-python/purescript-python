@@ -33,13 +33,12 @@ import Data.List ((\\), intersect)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (fromMaybe)
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Hierarchy as P
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.Common as Common
@@ -57,7 +56,6 @@ import Language.PureScript.PSString (PSString, mkString, decodeStringWithReplace
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
-import System.FilePath.Posix ((</>))
 import Language.PureScript.CodeGen.Py.Common (unmangle)
 import Language.PureScript.CodeGen.Py.Naming (identToPy)
 
@@ -302,7 +300,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   valueToJs' (Constructor (_, _, _, Just IsNewtype) _ ctor _) =
     let ctorName = properToJs ctor
         constructor =
-          AST.Function Nothing (Just ctorName) [] $ AST.Block
+          AST.Function Nothing (Just ctorName) [] $ AST.Block Nothing
             [ AST.Throw Nothing $
                 AST.App Nothing (AST.Var Nothing $ unmangle "Error") [AST.StringLiteral Nothing $ mkString ctorName]
             ]
@@ -311,7 +309,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
             (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"])
     in return $ AST.Block Nothing 
         [ constructor
-        , AST.Assignment Nothing (accessorString "create" (AST.Var Nothing ctorName)) constructor
+        , AST.Assignment Nothing (accessorString "create" (AST.Var Nothing ctorName)) createFn
         , AST.Var Nothing ctorName
         ]
 
@@ -395,7 +393,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
       go _ _ _ = internalError "Invalid arguments to bindersToJs"
 
       failedPatternError :: [Text] -> AST
-      failedPatternError names = ST.App Nothing (AST.Var Nothing $ unmangle "Error") [AST.Binary Nothing AST.Add (AST.StringLiteral Nothing $ mkString failedPatternMessage) (AST.ArrayLiteral Nothing $ zipWith valueError names vals)]
+      failedPatternError names = AST.App Nothing (AST.Var Nothing $ unmangle "Error") [AST.Binary Nothing AST.Add (AST.StringLiteral Nothing $ mkString failedPatternMessage) (AST.ArrayLiteral Nothing $ zipWith valueError names vals)]
 
       failedPatternMessage :: Text
       failedPatternMessage = "Failed pattern match at " <> runModuleName mn <> " " <> displayStartEndPos ss <> ": "

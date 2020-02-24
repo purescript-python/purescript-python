@@ -8,3 +8,4 @@ stack.yaml.lock
 pspy-blueprint-*.zip
 
 .DS_Store
+pspy-blueprint

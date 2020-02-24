@@ -393,7 +393,13 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
       go _ _ _ = internalError "Invalid arguments to bindersToJs"
 
       failedPatternError :: [Text] -> AST
-      failedPatternError names = AST.App Nothing (AST.Var Nothing $ unmangle "Error") [AST.Binary Nothing AST.Add (AST.StringLiteral Nothing $ mkString failedPatternMessage) (AST.ArrayLiteral Nothing $ zipWith valueError names vals)]
+      failedPatternError names =
+        let joinStr = accessorString "join" (AST.StringLiteral Nothing ",")
+        in AST.App Nothing (AST.Var Nothing $ unmangle "Error")
+            [ AST.Binary Nothing AST.Add
+                (AST.StringLiteral Nothing $ mkString failedPatternMessage) $
+                  AST.App Nothing joinStr [AST.ArrayLiteral Nothing $ zipWith valueError names vals]
+            ]
 
       failedPatternMessage :: Text
       failedPatternMessage = "Failed pattern match at " <> runModuleName mn <> " " <> displayStartEndPos ss <> ": "

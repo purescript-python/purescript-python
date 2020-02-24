@@ -29,9 +29,9 @@ Calling Convention
 -------------------------------
 
 This is also a reason why PureScript is pragmatic,
-because it use the same calling convention like Python's.
+because it uses the same calling convention as Python's.
 
-It supports tail call optimizations, but, a purescript function like
+It supports tail call optimizations, e.g., a purescript function like
 
 ```purescript
 f x y = x + y

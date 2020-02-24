@@ -20,7 +20,6 @@ cache:
   - $HOME/.ghc
   - $HOME/.cabal
   - $HOME/.stack
-  - $TRAVIS_BUILD_DIR/.stack-work
 
 jobs:
   include:

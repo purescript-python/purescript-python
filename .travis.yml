@@ -79,5 +79,4 @@ deploy:
   api_key: $RELEASE_AUTH_KEY
   file: $ZIP_FILE
   skip_cleanup: true
-  on:
-    tags: true
+  draft: true

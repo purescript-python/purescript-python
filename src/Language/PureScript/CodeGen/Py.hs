@@ -248,7 +248,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
     return $ accessorString "value" $ qualifiedToJS id name
   valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
-    return $ qualifiedToJS id name
+    return $ accessorString "create" $ qualifiedToJS id name
   valueToJs' (Accessor _ prop val) =
     indexerString prop <$> valueToJs val
   valueToJs' (ObjectUpdate _ o ps) = do
@@ -300,9 +300,20 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     ret <- valueToJs val
     return $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing (ds' ++ [AST.Return Nothing ret]))) []
   valueToJs' (Constructor (_, _, _, Just IsNewtype) _ ctor _) =
-    return $ AST.VariableIntroduction Nothing (properToJs ctor) (Just $
-                  AST.Function Nothing Nothing ["value"]
-                    (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"]))
+    let ctorName = properToJs ctor
+        constructor =
+          AST.Function Nothing (Just ctorName) [] $ AST.Block
+            [ AST.Throw Nothing $
+                AST.App Nothing (AST.Var Nothing $ unmangle "Error") [AST.StringLiteral Nothing $ mkString ctorName]
+            ]
+        createFn =
+          AST.Function Nothing Nothing ["value"]
+            (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"])
+    in return $ AST.Block Nothing 
+        [ constructor
+        , AST.Assignment Nothing (accessorString "create" (AST.Var Nothing ctorName)) constructor
+        , AST.Var Nothing ctorName
+        ]
 
   valueToJs' (Constructor _ _ ctor []) =
     return $ AST.Block Nothing
@@ -313,10 +324,18 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
            ]
 
   valueToJs' (Constructor _ _ ctor fields) =
+
     let constructor =
           let body = [ AST.Assignment Nothing ((indexerString $ mkString $ identToPy f) this) (var f) | f <- fields ]
           in AST.Function Nothing (Just (properToJs ctor)) (identToPy `map` fields ++ [thisName]) (AST.Block Nothing $ body ++ [AST.Return Nothing this])
-    in return constructor
+        createFn =
+          let body = AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) (var `map` fields)
+          in foldr (\f inner -> AST.Function Nothing Nothing [identToJs f] (AST.Block Nothing [AST.Return Nothing inner])) body fields
+    in return $ AST.Block Nothing 
+        [ constructor
+        , AST.Assignment Nothing (accessorString "create" (AST.Var Nothing (properToJs ctor))) createFn
+        , AST.Var Nothing (properToJs ctor)
+        ]
 
   literalToValueJS :: SourceSpan -> Literal (Expr Ann) -> m AST
   literalToValueJS ss (NumericLiteral (Left i)) = return $ AST.NumericLiteral (Just ss) (Left i)
@@ -376,7 +395,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
       go _ _ _ = internalError "Invalid arguments to bindersToJs"
 
       failedPatternError :: [Text] -> AST
-      failedPatternError names = AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing "Error") [AST.Binary Nothing AST.Add (AST.StringLiteral Nothing $ mkString failedPatternMessage) (AST.ArrayLiteral Nothing $ zipWith valueError names vals)]
+      failedPatternError names = ST.App Nothing (AST.Var Nothing $ unmangle "Error") [AST.Binary Nothing AST.Add (AST.StringLiteral Nothing $ mkString failedPatternMessage) (AST.ArrayLiteral Nothing $ zipWith valueError names vals)]
 
       failedPatternMessage :: Text
       failedPatternMessage = "Failed pattern match at " <> runModuleName mn <> " " <> displayStartEndPos ss <> ": "

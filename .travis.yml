@@ -76,7 +76,7 @@ before_deploy:
 
 deploy:
   provider: releases
-  api_key: $RELEASE_AUTH_KEY
+  api_key: $GITHUB_TOKEN
   file: $ZIP_FILE
   skip_cleanup: true
   draft: true

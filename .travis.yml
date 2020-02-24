@@ -73,6 +73,7 @@ script:
 
 before_deploy:
   - source ./travis-env.sh
+  - git tag $RELEASE_TAG
 
 deploy:
   provider: releases

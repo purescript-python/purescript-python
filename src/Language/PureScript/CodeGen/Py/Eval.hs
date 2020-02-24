@@ -162,8 +162,10 @@ takeSourceLoc
         { spanName=filename
         , spanStart =
             SourcePos
-            { sourcePosLine=line
-            , sourcePosColumn=col
+            { sourcePosLine = line'
+            , sourcePosColumn = col
             }
         }
-     = SourceLoc {line, col, filename}
+     = let line = line' + 1 in
+        -- Issue #8
+        SourceLoc {line, col, filename}

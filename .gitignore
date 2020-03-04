@@ -2,10 +2,10 @@
 purescript-python.cabal
 *~
 .idea/
-
 stack.yaml.lock
-
 # for making statically built libs
 pspy-blueprint-*.zip
-
 .DS_Store
+stack.yaml.lock
+.DS_Store
+pspy-blueprint

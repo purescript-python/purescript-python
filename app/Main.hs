@@ -18,6 +18,7 @@ import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.Encoding as L
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.UTF8 as BSU
 import qualified Data.Set as S
 
 
@@ -52,6 +53,7 @@ import qualified Control.Monad.State as State
 import Monads.STEither
 import Topdown.Pretty (PrettyTopdown)
 import Topdown.Raw ()
+import Topdown.Topdown (serialize)
 import Codec.Archive.Zip
 
 instance MonadReader Options (STEither Options MultipleErrors) where
@@ -131,25 +133,33 @@ cg outPretty baseOutDir coreFnMN = do
       mp      = modulePath module'
       -- name of the generated python package
       package = takeFileName baseOutDir
-  putStrLn $ "processing " ++ show mn
   hasForeign <- case flip State.runStateT defaultOpts . runSTEither .runSupplyT 5 $
         moduleToJS module' (T.pack package) of
       Left e -> print (e :: MultipleErrors) >> exitFailure
       Right (((hasForeign, ast), _), _) -> do
         let augmentedAST = everywhere (astSSToAbsPath pwd) ast
             outDir = runToModulePath [pwd, baseOutDir] [] mn
-            implSrcPath = outDir </> "pure.pure.py"
-            implPrettyPath = outDir </> "pure.pretty.py"
-            implZipPath = outDir </> "pure.zip.py"
-            implLoaderPath = outDir </> "pure.py"
+            to :: FilePath -> FilePath
+            to = (outDir </>)
+            --  "pure.pretty.py" -- when require pretty print
+            --  "pure.zip.py"       -- when file too big
+            --  "pure.raw.py"       -- when file in proper size
+            --  "pure.py"
             implCode :: forall a. EvalJS a => a
             implCode = finally augmentedAST
-
+        putStrLn $ "Generating Python code to " ++ outDir
         createDirectoryIfMissing True outDir
         selector <- mkEntrySelector "source"
-        createArchive implZipPath (addEntry BZip2  (toStrict implCode) selector)
-        T.writeFile implLoaderPath loaderCode
-        when outPretty $ T.writeFile implPrettyPath (codePretty implCode)
+
+        let lazyCode :: BL.ByteString
+            lazyCode = implCode
+        if fromIntegral (BL.length lazyCode) > zipThreshold then
+          -- TODO: use https://www.stackage.org/haddock/lts-15.2/zip-1.3.1/Codec-Archive-Zip.html#v:sourceEntry
+          createArchive (to "pure.zip.py") (addEntry BZip2 (toStrict $ serialize implCode) selector)
+        else
+          B.writeFile (to "pure.raw.py") (toStrict lazyCode)
+        T.writeFile (to "pure.py") loaderCode
+        when outPretty $ T.writeFile (to "pure.pretty.py") (codePretty implCode)
 
 
         return hasForeign

@@ -14,7 +14,8 @@ instance Topdown ByteString where
   tfFloat = toByteString
   tfInt = toByteString
   tfStr = toByteString . escape
-  tfBool = toByteString
+  tfBool True = "True"
+  tfBool False = "False"
   tfUnit = "None"
   tfCons n xs = BLU.fromString n <> "(" <> B.intercalate "," xs <> ")"
   tfSeq xs = "[" <> B.intercalate "," xs <> "]"

@@ -1,14 +1,6 @@
 -- | This module implements a data file format,
 -- tentatively called `topdown`.
-module Topdown.Core(Topdown(..), serialize, Serial, Lines) where
-
-import Control.Monad.State
-import qualified Data.Map as Map
-import qualified Data.Text as Text
-import Text.Printf (printf)
-import Data.List (intercalate)
-
-type Text = Text.Text
+module Topdown.Core(Topdown(..)) where
 
 class Topdown a where
   tfFloat :: Double -> a
@@ -20,57 +12,3 @@ class Topdown a where
   tfSeq :: [a] -> a
   tfVar :: String -> a
   tfAcc :: a -> String -> a
-
-type Serial a = State (Map.Map String Int) a
-
-
-stringCompress :: String -> Serial Int
-stringCompress s = do
-  direct <- get
-  case Map.lookup s direct of
-    Nothing -> do
-      let i = Map.size direct
-      put (Map.insert s i direct)
-      return i
-    Just i -> return i
-
-type Lines = [Text]
-
-instance Topdown (Serial Lines)  where
-  tfFloat = return . pure . Text.pack . ('f':) . show
-  tfInt = return . pure . Text.pack . ('i':) . show
-  tfBool = return . pure . Text.pack . ('b':) . show
-  tfUnit = return . pure . Text.pack $ "n"
-  tfAcc subj attr = do
-      s <- subj
-      return (Text.pack ("a" ++ attr):s)
-  tfStr s = do
-    si <- stringCompress s
-    return [Text.pack ('s':show si)]
-  tfVar s = do
-    si <- stringCompress s
-    return [Text.pack ('v':show si)]
-  tfCons constructor args = do
-    args <- concat <$> sequence args
-    constructor <- stringCompress constructor
-    let n = show (length args)
-        loads :: Lines
-        loads = Text.pack ('c':n ++ " " ++ show constructor) : args
-    return loads
-  tfSeq args = do
-    args <- concat <$> sequence args
-    let n = show (length args)
-        loads :: Lines
-        loads = Text.pack ('l':n):args
-    return loads
-
-serialize :: Serial Lines -> Text
-serialize m =
-  let (lines, compressed) = runState m Map.empty
-      compressedSize = Map.size compressed
-      genCompress :: Lines -> (String, Int) -> Lines
-      genCompress init (string, intIdx) =
-        let head = show intIdx ++ " " ++ show (length string)
-        in [Text.pack string, Text.pack head] ++ init
-      compressTable = reverse $ foldl genCompress [] (Map.toList compressed)
-  in Text.intercalate (Text.pack "\n") $ Text.pack (show compressedSize): compressTable ++ lines

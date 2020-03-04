@@ -37,12 +37,6 @@ py_inst_of l r =
       , r
       ]
 
-py_attr_of :: forall a. Topdown a => a -> String -> a
-py_attr_of subject attr =
-  tfCons "getattr"
-    [ subject
-    , tfStr attr
-    ]
 
 applyAs :: forall a. Topdown a => As a -> a -> a -> a
 applyAs a l r = case a of
@@ -50,12 +44,12 @@ applyAs a l r = case a of
     AsCall f -> tfCons "call" [f, l, r]
     AsBin op -> tfCons "binop"
         [ l
-        , py_attr_of (tfVar "BinOp") op
+        , tfAcc (tfVar "BinOp") op
         , r
         ]
     AsCmp op -> tfCons "cmp"
         [ l
-        , py_attr_of (tfVar "Compare") op
+        , tfAcc (tfVar "Compare") op
         , r
         ]
 
@@ -83,7 +77,7 @@ instance Topdown a => EvalJS a where
             | BitwiseNot <- op = "INVERT"
             | Positive <- op = "POSITIVE"
             | otherwise = error "impossible unary operator"
-        in  tfCons "uop" [py_attr_of (tfVar "UOp") op', e]
+        in  tfCons "uop" [tfAcc (tfVar "UOp") op', e]
 
     binary op l r =
         let
@@ -129,7 +123,6 @@ instance Topdown a => EvalJS a where
         in   applyAs op' l r
 
     getAttr a attr = tfCons "get_attr" [a, tfStr attr]
-
     setAttr a attr v = tfCons "set_attr" [a, tfStr attr, v]
     getItem a i =  tfCons "get_item" [a, i]
     setItem a i v = tfCons "set_item" [a, i, v]

@@ -1,4 +1,6 @@
-module Serialize.TaglessPacker(TaglessDump(..), runPacker, Serial, Lines) where
+-- | This module implements a data file format,
+-- tentatively called `topdown`.
+module Topdown.Core(Topdown(..), serialize, Serial, Lines) where
 
 import Control.Monad.State
 import qualified Data.Map as Map
@@ -8,7 +10,7 @@ import Data.List (intercalate)
 
 type Text = Text.Text
 
-class TaglessDump a where
+class Topdown a where
   tfFloat :: Double -> a
   tfInt :: Integer -> a
   tfStr :: String -> a
@@ -17,6 +19,7 @@ class TaglessDump a where
   tfCons :: String -> [a] -> a
   tfSeq :: [a] -> a
   tfVar :: String -> a
+  tfAcc :: a -> String -> a
 
 type Serial a = State (Map.Map String Int) a
 
@@ -33,11 +36,14 @@ stringCompress s = do
 
 type Lines = [Text]
 
-instance TaglessDump (Serial Lines)  where
+instance Topdown (Serial Lines)  where
   tfFloat = return . pure . Text.pack . ('f':) . show
   tfInt = return . pure . Text.pack . ('i':) . show
   tfBool = return . pure . Text.pack . ('b':) . show
   tfUnit = return . pure . Text.pack $ "n"
+  tfAcc subj attr = do
+      s <- subj
+      return (Text.pack ("a" ++ attr):s)
   tfStr s = do
     si <- stringCompress s
     return [Text.pack ('s':show si)]
@@ -58,13 +64,13 @@ instance TaglessDump (Serial Lines)  where
         loads = Text.pack ('l':n):args
     return loads
 
-runPacker :: Serial Lines -> Text
-runPacker m =
+serialize :: Serial Lines -> Text
+serialize m =
   let (lines, compressed) = runState m Map.empty
       compressedSize = Map.size compressed
       genCompress :: Lines -> (String, Int) -> Lines
       genCompress init (string, intIdx) =
         let head = show intIdx ++ " " ++ show (length string)
-        in Text.pack (head ++ "\n" ++ string):init
-      compressTable = foldl genCompress [] (Map.toList compressed)
-  in Text.intercalate (Text.pack "\n") $ compressTable ++ lines
+        in [Text.pack string, Text.pack head] ++ init
+      compressTable = reverse $ foldl genCompress [] (Map.toList compressed)
+  in Text.intercalate (Text.pack "\n") $ Text.pack (show compressedSize): compressTable ++ lines

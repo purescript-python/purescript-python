@@ -2,6 +2,7 @@
 -- 1. `zfsr32`, which implements zero_fill_shift_right for 32-bit integers
 -- 2. `Error(msg, self) = Exception(msg)`
 -- 3. `import_module` from importlib (>=Python 3.5)
+{-# LANGUAGE UndecidableInstances #-}
 module Language.PureScript.CodeGen.Py.Serializer where
 
 import Language.PureScript.CodeGen.Py.Common
@@ -17,21 +18,18 @@ import Control.Applicative hiding (optional)
 import Control.Arrow ((&&&))
 import Data.Maybe (fromJust)
 import Data.Text.Prettyprint.Doc
-import Serialize.TaglessPacker
+import Topdown.Core
 
 
-type Py = Serial Lines
+-- serialize python
 
-just :: String -> Py
-just = pretty
+data As a where
+    AsCall  :: forall a. Topdown a => a -> As a
+    AsBin   :: String -> As a
+    AsCmp   :: String -> As a
+    AsOther :: forall a. Topdown a => ((a, a) -> a) -> As a
 
-data As
-    = AsCall Py
-    | AsBin String
-    | AsCmp String
-    | AsOther ((Py, Py) -> Py)
-
-py_inst_of :: Py -> Py -> Py
+py_inst_of :: forall a. Topdown a => a -> a -> a
 py_inst_of l r =
     tfCons "call"
       [ tfCons "var" [tfStr "isinstance"]
@@ -39,14 +37,14 @@ py_inst_of l r =
       , r
       ]
 
-py_attr_of :: Py -> String -> Py
+py_attr_of :: forall a. Topdown a => a -> String -> a
 py_attr_of subject attr =
   tfCons "getattr"
     [ subject
     , tfStr attr
     ]
 
-applyAs :: As -> Py -> Py -> Py
+applyAs :: forall a. Topdown a => As a -> a -> a -> a
 applyAs a l r = case a of
     AsOther f -> f (l, r)
     AsCall f -> tfCons "call" [f, l, r]
@@ -61,20 +59,20 @@ applyAs a l r = case a of
         , r
         ]
 
-optional :: Maybe Py -> Py
+optional :: forall a. Topdown a => Maybe a -> a
 optional (Just a) = a
 optional Nothing = tfUnit
 
 pattern Optional a <- (optional -> a)
 
-instance EvalJS (Doc Py) where
+instance Topdown a => EvalJS a where
 
     none = tfUnit
     intLit i = tfInt i
     doubleLit f = tfFloat f
     strLit s = tfStr s
     boolLit b = tfBool b
-    objLit xs = tfCons "record" xs
+    objLit xs = tfCons "record" $ flip map xs $ \(field, o) -> tfCons "make_pair" [tfStr field, o]
     arrayLit xs = tfSeq xs
     unary op e =
         let
@@ -90,7 +88,7 @@ instance EvalJS (Doc Py) where
     binary op l r =
         let
             is a = a == op
-            op' :: As
+            op' :: As a
             op' | is Add       =  AsBin "ADD"
                 | is Subtract  =  AsBin "SUBTRACT"
                 | is Multiply  =  AsBin "MULTIPLY"
@@ -167,6 +165,6 @@ instance EvalJS (Doc Py) where
     retNoRes    = tfCons "ret" [tfUnit]
     throw v     = tfCons "throw" [v]
     isa inst ty = tfCons "isa" [inst, ty]
-    comment cs exp = tfCons "document" [tfStr (lines (map (T.unpack) cs)), exp]
+    comment cs exp = tfCons "document" [tfStr (unlines (map (T.unpack) cs)), exp]
     located SourceLoc {line, col, filename} term =
-        tfCons "metadata" [tfInt line, tfInt col, tfStr filename, term]
+        tfCons "metadata" [tfInt (toInteger line), tfInt (toInteger col), tfStr filename, term]

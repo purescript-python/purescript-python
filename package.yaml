@@ -41,8 +41,12 @@ dependencies:
   - utf8-string >=1 && <2
   - purescript
   - prettyprinter
+  - bytestring-conversion
+  - utf8-string
+  - zip
 
 default-extensions:
+  - GADTs
   - ViewPatterns
   - DeriveGeneric
   - DeriveFunctor
@@ -90,14 +94,12 @@ when:
 library:
   source-dirs: src
 
-#executables:
-
-#executables:
-#  pspy-blueprint:
-#    main: Main.hs
-#    source-dirs: app
-#    dependencies:
-#      - purescript-python
+executables:
+  pspy-blueprint:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - purescript-python
 
 tests:
   purescript-python-test:

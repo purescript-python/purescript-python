@@ -154,7 +154,13 @@ finally n = loc $ case n of
              BlockComment x -> x
         in comment (map f cs) (finally exp)
 
-    where loc | Just loc <- getSourceSpan n = located $ takeSourceLoc loc
+    where loc | Just loc <- getSourceSpan n =
+                    let loc' = takeSourceLoc loc
+                    in  if line loc' == 0 then id
+                            -- This is actually invalid line number,
+                            -- and will break the support of Python 3.5.
+                        else
+                            located loc'
               | otherwise = id
 
 takeSourceLoc
@@ -166,6 +172,7 @@ takeSourceLoc
             , sourcePosColumn = col
             }
         }
-     = let line = line' + 1 in
+     =
+        let line = line' + 1 in
         -- Issue #8
         SourceLoc {line, col, filename}

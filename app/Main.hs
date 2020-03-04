@@ -46,7 +46,7 @@ import Language.PureScript.CodeGen.Py.Common (escape)
 import Control.Monad.Supply
 
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
-import Data.Text.Prettyprint.Doc (Doc, layoutPretty, defaultLayoutOptions)
+import Data.Text.Prettyprint.Doc (Doc, layoutPretty, layoutCompact)
 
 import Control.Monad.Reader (MonadReader(..))
 import qualified Control.Monad.State as State
@@ -172,7 +172,7 @@ astSSToAbsPath pwd n =
       withSourceSpan (ss {P.spanName = joinPath [pwd, SP.spanName ss]}) n
 
 doc2Text :: Doc ann -> T.Text
-doc2Text = renderStrict . layoutPretty defaultLayoutOptions
+doc2Text = renderStrict . layoutCompact
 
 legalizedCodeGen :: String -> FilePath -> Doc Py -> Text
 legalizedCodeGen mName mPath sexpr =

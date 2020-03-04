@@ -90,16 +90,18 @@ when:
 library:
   source-dirs: src
 
-executables:
-  pspy-blueprint:
-    main: Main.hs
-    source-dirs: app
-    dependencies:
-      - purescript-python
+#executables:
 
-#tests:
-#  purescript-python-test:
-#    main: Spec.hs
-#    source-dirs: test
+#executables:
+#  pspy-blueprint:
+#    main: Main.hs
+#    source-dirs: app
 #    dependencies:
 #      - purescript-python
+
+tests:
+  purescript-python-test:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - purescript-python

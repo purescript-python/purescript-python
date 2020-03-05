@@ -22,7 +22,7 @@ PureScript(especially PureScript-python) for what?
 - <details><summary>Excellent IDE, better type-driven programming experience, less of mental burden.</summary>
   
    You understand what does
-        "implicit type inference + auto-completion + real-time error highting + type constraints by advanced type system" mean?
+        "implicit type inference + auto-completion + real-time error highlighting + type constraints by advanced type system" mean?
 
    </details>
 

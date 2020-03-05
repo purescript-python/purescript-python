@@ -75,7 +75,7 @@ script:
 
 before_deploy:
   - source ./travis-env.sh
-  - source ./ci-passing.sh
+  - bash ./ci-passing.sh
   - git tag $RELEASE_TAG
 
 deploy:

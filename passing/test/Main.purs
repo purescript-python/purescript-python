@@ -13,4 +13,4 @@ main = do
   testDatatypes
   testPM
   testRecords
-  log "done"
+  log "CI tests passing!"

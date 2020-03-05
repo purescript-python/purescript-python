@@ -67,11 +67,13 @@ script:
 - |
   set -ex
   stack --no-terminal build
+  stack --no-terminal install
   set +ex
 
 
 before_deploy:
   - source ./travis-env.sh
+  - source ./ci-passing.sh
   - git tag $RELEASE_TAG
 
 deploy:

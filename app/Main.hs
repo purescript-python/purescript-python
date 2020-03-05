@@ -60,10 +60,6 @@ instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither State.get
     local r (STEither m) = STEither (State.modify r >> m)
 
-
-zipThreshold :: Int
-zipThreshold = 256 * 512
-
 defaultOpts :: Options
 defaultOpts =
     Options { optionsVerboseErrors = True
@@ -81,31 +77,33 @@ main = do
          , moduleParts
          , "--ffi-dep"
          , ffiDepPath
-         , "--out-pretty"
-         , outPretty] -> do
+         , "--out-format"
+         , outFormat] -> do
             ffiDeps <-
               fixPointCG
-                (read outPretty)
+                (read outFormat)
                 baseOutDir
                 S.empty
                 (S.empty, [moduleNameFromString $ T.pack moduleParts])
             T.writeFile ffiDepPath (T.unlines $ map T.pack ffiDeps)
         _ ->
           putStrLn
-            "Malformed options, expect form --py-dir <dir0> --entry-mod <A.B.C> --ffi-dep <xxx> --out-pretty [True|False]." >> exitFailure
+            "Malformed options, expect form --py-dir <dir0> --entry-mod <A.B.C> --ffi-dep <xxx> --out-format [Pretty|Compact|Compressed]." >> exitFailure
+
+data OutFormat = Pretty | Compact | Compressed deriving (Read)
 
 -- code generation for used modules
-fixPointCG :: Bool -> FilePath -> S.Set FilePath -> (S.Set P.ModuleName, [P.ModuleName]) -> IO [FilePath]
-fixPointCG outPretty baseOutDir ffiPathReferred (importedModules, moduleImportDeque) =
+fixPointCG :: OutFormat -> FilePath -> S.Set FilePath -> (S.Set P.ModuleName, [P.ModuleName]) -> IO [FilePath]
+fixPointCG outFormat baseOutDir ffiPathReferred (importedModules, moduleImportDeque) =
   case moduleImportDeque of
     [] -> return $ S.toList ffiPathReferred
     m:ms
      | m `S.member` importedModules || isBuiltinModuleName m ->
-       fixPointCG outPretty baseOutDir ffiPathReferred (importedModules, ms)
+       fixPointCG outFormat baseOutDir ffiPathReferred (importedModules, ms)
      | otherwise -> do
-       (newModsToImport, newFFIReferred) <- cg outPretty baseOutDir m
+       (newModsToImport, newFFIReferred) <- cg outFormat baseOutDir m
        fixPointCG
-        outPretty
+        outFormat
         baseOutDir
         (S.union ffiPathReferred newFFIReferred)
         (S.insert m importedModules, newModsToImport ++ ms)
@@ -114,14 +112,15 @@ toStrict :: BL.ByteString -> B.ByteString
 toStrict = B.concat . BL.toChunks
 
 -- code generation for each  module
-cg :: Bool -> FilePath -> P.ModuleName -> IO ([P.ModuleName], S.Set FilePath)
-cg outPretty baseOutDir coreFnMN = do
+cg :: OutFormat -> FilePath -> P.ModuleName -> IO ([P.ModuleName], S.Set FilePath)
+cg outFormat baseOutDir coreFnMN = do
   pwd      <- getCurrentDirectory
+  let qualifiedMN = runModuleName [] [] coreFnMN
   -- TODO: customizable `output` directory
   let jsonFile = joinPath
         [ pwd
         , "output"
-        , runModuleName [] [] coreFnMN
+        , qualifiedMN
         , "corefn.json"
         ]
 
@@ -141,29 +140,21 @@ cg outPretty baseOutDir coreFnMN = do
             outDir = runToModulePath [pwd, baseOutDir] [] mn
             to :: FilePath -> FilePath
             to = (outDir </>)
-            --  "pure.pretty.py" -- when require pretty print
-            --  "pure.zip.py"       -- when file too big
-            --  "pure.raw.py"       -- when file in proper size
-            --  "pure.py"
             implCode :: forall a. EvalJS a => a
             implCode = finally augmentedAST
-        putStrLn $ "Generating Python code to " ++ outDir
+
+        putStrLn $ "Codegen Python for " ++ qualifiedMN
         createDirectoryIfMissing True outDir
-        selector <- mkEntrySelector "source"
 
-        let lazyCode :: BL.ByteString
-            lazyCode = implCode
-        if fromIntegral (BL.length lazyCode) > zipThreshold then
-          -- TODO: use https://www.stackage.org/haddock/lts-15.2/zip-1.3.1/Codec-Archive-Zip.html#v:sourceEntry
-          createArchive (to "pure.zip.py") (addEntry BZip2 (toStrict $ serialize implCode) selector)
-        else
-          B.writeFile (to "pure.raw.py") (toStrict lazyCode)
+        case outFormat of
+            Pretty  -> BL.writeFile (to "pure.raw.py") implCode
+            Compact -> T.writeFile (to "pure.raw.py") (codePretty implCode)
+            Compressed -> do
+              selector <- mkEntrySelector "source"
+              createArchive (to "pure.zip.py") (addEntry BZip2 (toStrict $ serialize implCode) selector)
         T.writeFile (to "pure.py") loaderCode
-        when outPretty $ T.writeFile (to "pure.pretty.py") (codePretty implCode)
-
-
         return hasForeign
-  
+
   let newModsToImport = map snd (moduleImports module')
   let newFModToAdd = S.fromList [mp | hasForeign]
   return (newModsToImport, newFModToAdd)

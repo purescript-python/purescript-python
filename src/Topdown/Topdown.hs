@@ -39,13 +39,14 @@ instance Topdown (Serial ByteString)  where
   tfCons constructor args = do
     args <- sequence args
     constructor <- toByteString <$> stringCompress constructor
-    let n = toByteString (length args)
-        loads = "c" <> n <> " " <>  constructor <> "\n" <> B.intercalate "\n" args
+    let loads | [] <- args = "c0 " <> constructor
+              | otherwise = "c" <> toByteString (length args) <> " " <>  constructor <> "\n" <> B.intercalate "\n" args
     return loads
   tfSeq args = do
     args <- sequence args
-    let n = toByteString (length args)
-        loads = "l" <> n <> "\n" <> B.intercalate "\n" args
+    let loads | [] <- args = "l0"
+              | otherwise =  "l" <> toByteString (length args) <> "\n" <> B.intercalate "\n" args
+
     return loads
 
 serialize :: Serial ByteString -> ByteString
@@ -58,5 +59,5 @@ serialize m =
             <> "\n" <> BU.fromString string
             <> "\n" <> init
       compressTable = foldl genCompress "" (Map.toList compressed)
-  in toByteString compressedSize <> "\n" <> compressTable <> "\n" <> lines
+  in toByteString compressedSize <> "\n" <> compressTable <> "\n" <> lines <> "\n"
 

@@ -141,8 +141,7 @@ instance Topdown a => EvalJS a where
 
     new f args = tfCons "new" (f:args)
 
-    block xs   =  tfCons "block" xs
-
+    block    =  tfCons "block"
     var (Unbox n) = tfCons "var" [tfStr n]
     var This      = tfVar "this" -- TODO: correct mangling for this in ../Py.hs
     var Import    = tfCons "var" [tfStr "import_module"]
@@ -158,6 +157,6 @@ instance Topdown a => EvalJS a where
     retNoRes    = tfCons "ret" [tfUnit]
     throw v     = tfCons "throw" [v]
     isa inst ty = tfCons "isa" [inst, ty]
-    comment cs exp = tfCons "document" [tfStr (unlines (map (T.unpack) cs)), exp]
+    comment cs exp = tfCons "document" [tfStr (unlines (map T.unpack cs)), exp]
     located SourceLoc {line, col, filename} term =
         tfCons "metadata" [tfInt (toInteger line), tfInt (toInteger col), tfStr filename, term]

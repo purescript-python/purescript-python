@@ -107,7 +107,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps
     let exportObj = [AST.Assignment Nothing (AST.Var Nothing $ unmangle "exports") exps']
     return (hasForeign, AST.Block Nothing $ moduleBody ++ exportObj)
-  
+
   where
   thisName = unmangle ".this"
   this     = AST.Var Nothing thisName
@@ -116,10 +116,10 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   runModuleNameImpl :: [Text] -> [Text] -> P.ModuleName -> Text
   runModuleNameImpl prefix suffix (P.ModuleName pns) =
     T.intercalate "."  (package:prefix ++ (P.runProperName <$> pns) ++ suffix)
-  
+
   runForeignModuleName = runModuleNameImpl ["ffi"] []
   runModuleName        = runModuleNameImpl [] ["pure"]
-  
+
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
   getNames (NonRec _ ident _) = [ident]
@@ -307,7 +307,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
         createFn =
           AST.Function Nothing Nothing ["value"]
             (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"])
-    in return $ AST.Block Nothing 
+    in return $ AST.Block Nothing
         [ constructor
         , AST.Assignment Nothing (accessorString "create" (AST.Var Nothing ctorName)) createFn
         , AST.Var Nothing ctorName
@@ -329,7 +329,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
         createFn =
           let body = AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) (var `map` fields)
           in foldr (\f inner -> AST.Function Nothing Nothing [identToJs f] (AST.Block Nothing [AST.Return Nothing inner])) body fields
-    in return $ AST.Block Nothing 
+    in return $ AST.Block Nothing
         [ constructor
         , AST.Assignment Nothing (accessorString "create" (AST.Var Nothing (properToJs ctor))) createFn
         , AST.Var Nothing (properToJs ctor)

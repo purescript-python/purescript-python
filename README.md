@@ -1,19 +1,10 @@
 
-# PureScript Python
+# PureScript to Python Compiler
 
-For implementation and code generation specification, check [Implementation](./Impl.md).
+[![Build Status](https://travis-ci.com/thautwarm/purescript-python.svg?branch=master)](https://travis-ci.com/thautwarm/purescript-python) [![gitter room](https://img.shields.io/badge/chat-tagful&nbsp;initial-Pink.svg?style=flat)](https://gitter.im/reliable-python/community) [![install](https://img.shields.io/badge/install-oneliner-blue.svg?style=flat)](https://github.com/purescript-python/installer/) [![py interop](https://img.shields.io/badge/interop-purescript↔python-teal.svg?style=flat)](./Interops.md)
 
-[This](https://github.com/purescript-python/example-hw) is the structure of a minimal PureScript-Python project, for previewing.
-
-[This document](./Calling-PS-From-Python.md) is about **how to call your PureScript project from Python**.
-
-Accurately, how to use Python code to call the Python package generated from your purescript project.
-
-If you want, we could discuss questions, or interesting stuffs related to Python/PureScript/Static Typing.
-
-At this Gitter Room [![gitter room](https://img.shields.io/badge/chat-Tagful&nbsp;Initial-Green.svg?style=flat)](https://gitter.im/reliable-python/community).
-
-
+- [Specification and Implementation](./Impl.md)
+- [Example Project](https://github.com/purescript-python/example-hw)
 
 ## Get Started
 
@@ -72,31 +63,6 @@ The home of PureScript is [PureScript.org](http://www.purescript.org/), where yo
 A major motivation for my working on PureScript is its lightweighted but awesome IDE support.
 
 For VSCode users, installing the plugin `PureScript IDE` and `File -> Preferences -> Settings -> (search purescript) -> Turn on "Add Spago sources"` will be sufficient. **No need to install some GitHub repo and build for 4 hours! And this IDE feels swift!**
-
-## HOW-TO: Using Python FFI files for My PS Projects
-
-For each project,
-if your project directory tree is
-
-```
-- src
-    - Main.purs
-    - Mod
-        - A.purs
-```
-
-If you have foreign definitions in module `Mod.A`, you need to
-create a directory `python-ffi` juxtaposing `src`, and it'll finally look like:
-
-```
-- python-ffi
-   - Mod
-      - A.py
-- src
-    - Main.purs
-    - Mod
-        - A.purs
-```
 
 ## LICENSE
 

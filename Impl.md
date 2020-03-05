@@ -3,26 +3,44 @@
 
 ## Motivation
 
-This is the successor to my works of Idris-Python.
+PureScript(especially PureScript-python) for what?
+- Simple and intuitive Python interop
+- <details>
+  <summary>Advanced type system</summary>
 
-Idris didn't provide me metadata such as source code positions hence debugging(especially FFI) is horrible,
-but PureScript's IR output is pretty nice.
+  - higher kinded types
+  - higer rank types
+  - functional dependencies
+  - extensible records
+  - data kinds
+  - etc..
+  
+  
+    This is an extreme of being pragmatic, and makes decoupling and composition easier.
 
-Besides, Idris FFI, though designed smart, but to be honest not that "industrially" practical, while
-PureScript's Haskell-like `foreign import` mechanism is extremely straightforward and flexible.
+  </details>
+- <details><summary>Excellent IDE, better type-driven programming experience, less of mental burden.</summary>
+  
+   You understand what does
+        "implicit type inference + auto-completion + real-time error highting + type constraints by advanced type system" mean?
 
-Then I found PureScript, and now I think I love it.
+   </details>
+
+- Multiple back ends: JavaScript, Go/C++, Python, Kotlin, etc.
 
 ## Status
 
-The code generation itself is finished, but still needs testing.
+Currently many purescript libraries are supported, like
+- prelude
+- generics-rep(for `deriving` type classes like `Show`, `Generic`, etc.)
+- console
+- effect
+- enums
+- controls
+- partial
+- etc.
 
-Currently I'm working on the support of some FFI libraries, for example, `Prelude`. Without `Prelude`
-we cannot even print anything or proceed testing.
-
-The first binary release(`v0.1`) will be available after
-- passing the testcases provided by PureScript GitHub repository, and
-- implementing an extensible and customizable Python FFI providing mechanism.
+purescript-python has grown up to some degree with pretty nice availability.
 
 ## Python Package Generation Specification
 
@@ -57,13 +75,14 @@ Command `pspy-blueprint` generates following directory tree(all `__init__.py` wi
     - A
         - B
             - pure.py
-            - pure.src.py
+            - pure.zip.py
+            - (optional) pure.raw.py
 
     - ffi
 - ffi-requires.txt # lines of paths from which FFI files are required
 ```
 
-`pure.src.py` Generated for Each Module
+`pure.raw.py` or `pure.zip.py` Generated for Each Module
 -----------------------------------------------
 
 This Python module creates Python code/bytecode object.
@@ -71,13 +90,20 @@ This Python module creates Python code/bytecode object.
 In CPython, every Python file will be compiled to a Python code object, which will finally be executed in
 CPython virtual machine.
 
-In `pure.src.py`, we just create the code object,
+In the earlier design, we create the code object in `pure.raw.py`,
 but don't execute it, for achieving the further flexibility of caching and composition of our compilation.
+
+Unfortunately, due to the heavy code generation by PureScript's type-level computation, the generated `pure.raw.py` can be always very huge and cause a `MemoryError` when you want to import it as a python module.
+
+To address this, we come up with a data file format [topdown](https://github.com/purescript-python/purescript-python/blob/master/src/Topdown/Topdown.hs) and use it to generate `pure.zip.py`, which is actually a `zip` file and shall be regarded as a compressed version of `pure.raw.py`, but also parse faster than a regular Python module. Sometimes, `pure.raw.py` can be more than 300MB,
+which certainly crash any `python` executable, but equivalent `pure.zip.py` can be only 50KB, with orders-of-magnitude speed up on parsing.
+
+
 
 `pure.py` Generated for Each Module
 ----------------------------------------------
 
-This is, actually the loader for corresponding `pure.src.py`.
+This is, actually the loader for corresponding `pure.zip.py`/`pure.raw.py`.
 
 This module implements the concrete code caching system which avoids the redundant Python source code to bytecode compilation, and finally greatly reduce the module loading time.
 

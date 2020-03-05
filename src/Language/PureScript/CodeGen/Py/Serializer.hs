@@ -67,7 +67,7 @@ instance Topdown a => EvalJS a where
     strLit s = tfStr s
     boolLit b = tfBool b
     objLit xs = tfCons "record" $ flip map xs $ \(field, o) -> tfCons "make_pair" [tfStr field, o]
-    arrayLit xs = tfSeq xs
+    arrayLit = tfCons "mktuple"
     unary op e =
         let
           op' :: String

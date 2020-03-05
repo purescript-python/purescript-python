@@ -12,7 +12,7 @@ instance Topdown (Doc PrettyTopdown) where
   tfStr = pretty . escape
   tfBool = pretty
   tfUnit = pretty "None"
-  tfCons n xs = pretty n <> tupled xs
+  tfCons n xs = pretty n <> vsep [align . tupled $ xs]
   tfSeq = list
   tfVar = pretty
   tfAcc subject attr = subject <> pretty "." <> pretty attr

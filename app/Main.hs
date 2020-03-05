@@ -19,6 +19,7 @@ import qualified Data.Text.Lazy.Encoding as L
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8 as BSU
+import qualified Data.ByteString.Lazy.UTF8 as BLU
 import qualified Data.Set as S
 
 
@@ -55,6 +56,7 @@ import Topdown.Pretty (PrettyTopdown)
 import Topdown.Raw ()
 import Topdown.Topdown (serialize)
 import Codec.Archive.Zip
+import StringEscape (escape)
 
 instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither State.get
@@ -147,11 +149,25 @@ cg outFormat baseOutDir coreFnMN = do
         createDirectoryIfMissing True outDir
 
         case outFormat of
-            Pretty  -> BL.writeFile (to "pure.raw.py") implCode
-            Compact -> T.writeFile (to "pure.raw.py") (codePretty implCode)
+            Compact ->
+                BL.writeFile (to "pure.raw.py") $
+                    BLU.fromString ("(" ++ escape mp ++ ",") <>
+                    implCode <>
+                    BLU.fromString ")"
+
+            Pretty ->
+                T.writeFile (to "pure.raw.py") $
+                    T.pack ("(" ++ escape mp ++ ",") <>
+                      codePretty implCode <>
+                    T.pack ")"
+            
             Compressed -> do
-              selector <- mkEntrySelector "source"
-              createArchive (to "pure.zip.py") (addEntry BZip2 (toStrict $ serialize implCode) selector)
+              source <- mkEntrySelector "source"
+              srcPath <- mkEntrySelector "srcpath"
+              createArchive (to "pure.zip.py") $ do
+                  addEntry BZip2 (toStrict $ serialize implCode) source
+                  addEntry BZip2 (BSU.fromString mp) srcPath
+
         T.writeFile (to "pure.py") loaderCode
         return hasForeign
 

@@ -24,6 +24,5 @@ passing/.spago
 
 # purescript-python
 passing/.pure-py/
-passing/pure-py.json
 passing/passing
 passing/**.src.py

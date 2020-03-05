@@ -1,21 +1,18 @@
 # Changelog for purescript-python
 
-2020-03-05: Version 0.1.2.0(Preview)
+2020-03-05: Version 0.1.2.0
 ---------------------------------
 
-- special optimization for repeating indices and attribute access.
-- the `topdown` file format to allow Python to load large scale code.
+- codegen support for JavaScript-specific behaviors: add default value `None` for each function argument. fix #10
+- faster codegen: avoid pretty print when not specified. #13
+- lighter volume: for generated files. type level computing can produce huge amount of code, to make generated code Git maintainable, we use bzip2 to compress stuffs. #13
+- options for pspy-blueprint changed(`--py-dir <dir0> --entry-mod <A.B.C> --ffi-dep <xxx> --out-format [Pretty|Compact|Compressed]`).
+- special optimization for repeating indexing and attribute accessing.
+- the `topdown` file format to allow Python to load large scale code, and load code faster. fix #13
 - tagless final approach to support multiple data formats of output IR for codegen,
   check `Topdown/{Raw.hs, Topdown.hs, Pretty.hs}.`.
-- add CI tests based on a purescript-python project
+- add CI tests based on a purescript-python project. #15
 
-2020-03-04: Version 0.1.2.0(Preview)
----------------------------------
-
-0. codegen behavior: add default value `None` for each function argument. fix #10
-1. faster codegen: avoid pretty print when not specified. #13
-2. lighter volume: for generated files. type level computing can produce huge amount of code, to make generated code Git maintainable, we use bzip2 to compress stuffs. #13
-3. options for pspy-blueprint changed.
 
 
 2020-02-24: Version 0.1.1.0

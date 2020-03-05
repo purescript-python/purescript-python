@@ -4,8 +4,6 @@ import System.Environment
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import System.FilePath ((</>), joinPath, takeFileName)
 
-import Text.Printf (printf)
-
 import Data.Aeson hiding (Options)
 import Data.Aeson.Types hiding (Options)
 
@@ -19,6 +17,9 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.Encoding as L
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.UTF8 as BSU
+import qualified Data.ByteString.Lazy.UTF8 as BLU
 import qualified Data.Set as S
 
 
@@ -39,24 +40,27 @@ import Language.PureScript.Names ( moduleNameFromString
 
 
 import Language.PureScript.CodeGen.Py (moduleToJS)
-import Language.PureScript.CodeGen.Py.Printer (Py, bindSExpr)
-import Language.PureScript.CodeGen.Py.Eval (finally)
-import Language.PureScript.CodeGen.Py.Common (escape)
-
+import Language.PureScript.CodeGen.Py.Serializer ()
+import Language.PureScript.CodeGen.Py.Eval (finally, EvalJS)
 import Control.Monad.Supply
 
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 import Data.Text.Prettyprint.Doc (Doc, layoutPretty, defaultLayoutOptions)
 
+import Control.Monad (when)
 import Control.Monad.Reader (MonadReader(..))
 import qualified Control.Monad.State as State
 
 import Monads.STEither
+import Topdown.Pretty (PrettyTopdown)
+import Topdown.Raw ()
+import Topdown.Topdown (serialize)
+import Codec.Archive.Zip
+import StringEscape (escape)
 
 instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither State.get
     local r (STEither m) = STEither (State.modify r >> m)
-
 
 defaultOpts :: Options
 defaultOpts =
@@ -69,44 +73,56 @@ main :: IO ()
 main = do
     opts <- getArgs
     case opts of
-        [ "--out-python"
+        [ "--py-dir"
          , baseOutDir
-         , "--corefn-entry"
+         , "--entry-mod"
          , moduleParts
-         , "--out-ffi-dep"
-         , ffiDepPath] -> do
+         , "--ffi-dep"
+         , ffiDepPath
+         , "--out-format"
+         , outFormat] -> do
             ffiDeps <-
               fixPointCG
+                (read outFormat)
                 baseOutDir
                 S.empty
                 (S.empty, [moduleNameFromString $ T.pack moduleParts])
             T.writeFile ffiDepPath (T.unlines $ map T.pack ffiDeps)
-        _ ->  putStrLn "Malformed options, expect form --out-python <dir0> --corefn-entry <A.B.C> --out-ffi-dep <xxx>." >> exitFailure
+        _ ->
+          putStrLn
+            "Malformed options, expect form --py-dir <dir0> --entry-mod <A.B.C> --ffi-dep <xxx> --out-format [Pretty|Compact|Compressed]." >> exitFailure
 
+data OutFormat = Pretty | Compact | Compressed deriving (Read)
 
-fixPointCG :: FilePath -> S.Set FilePath -> (S.Set P.ModuleName, [P.ModuleName]) -> IO [FilePath]
-fixPointCG baseOutDir ffiPathReferred (importedModules, moduleImportDeque) =
+-- code generation for used modules
+fixPointCG :: OutFormat -> FilePath -> S.Set FilePath -> (S.Set P.ModuleName, [P.ModuleName]) -> IO [FilePath]
+fixPointCG outFormat baseOutDir ffiPathReferred (importedModules, moduleImportDeque) =
   case moduleImportDeque of
     [] -> return $ S.toList ffiPathReferred
     m:ms
      | m `S.member` importedModules || isBuiltinModuleName m ->
-       fixPointCG baseOutDir ffiPathReferred (importedModules, ms)
+       fixPointCG outFormat baseOutDir ffiPathReferred (importedModules, ms)
      | otherwise -> do
-       (newModsToImport, newFFIReferred) <- cg baseOutDir m
+       (newModsToImport, newFFIReferred) <- cg outFormat baseOutDir m
        fixPointCG
+        outFormat
         baseOutDir
         (S.union ffiPathReferred newFFIReferred)
         (S.insert m importedModules, newModsToImport ++ ms)
 
+toStrict :: BL.ByteString -> B.ByteString
+toStrict = B.concat . BL.toChunks
+
 -- code generation for each  module
-cg :: FilePath -> P.ModuleName -> IO ([P.ModuleName], S.Set FilePath)
-cg baseOutDir coreFnMN = do
+cg :: OutFormat -> FilePath -> P.ModuleName -> IO ([P.ModuleName], S.Set FilePath)
+cg outFormat baseOutDir coreFnMN = do
   pwd      <- getCurrentDirectory
+  let qualifiedMN = runModuleName [] [] coreFnMN
   -- TODO: customizable `output` directory
   let jsonFile = joinPath
         [ pwd
         , "output"
-        , runModuleName [] [] coreFnMN
+        , qualifiedMN
         , "corefn.json"
         ]
 
@@ -122,21 +138,39 @@ cg baseOutDir coreFnMN = do
         moduleToJS module' (T.pack package) of
       Left e -> print (e :: MultipleErrors) >> exitFailure
       Right (((hasForeign, ast), _), _) -> do
-        let implCode =
-                legalizedCodeGen
-                  (runModuleName [package] ["pure"] mn)
-                  (joinPath [pwd, mp])
-                  (finally $ everywhere (astSSToAbsPath pwd) ast)
-
+        let augmentedAST = everywhere (astSSToAbsPath pwd) ast
             outDir = runToModulePath [pwd, baseOutDir] [] mn
-            implSrcPath = outDir </> "pure.src.py"
-            implLoaderPath = outDir </> "pure.py"
+            to :: FilePath -> FilePath
+            to = (outDir </>)
+            implCode :: forall a. EvalJS a => a
+            implCode = finally augmentedAST
 
+        putStrLn $ "Codegen Python for " ++ qualifiedMN
         createDirectoryIfMissing True outDir
-        T.writeFile implSrcPath implCode
-        T.writeFile implLoaderPath loaderCode
+
+        case outFormat of
+            Compact ->
+                BL.writeFile (to "pure.raw.py") $
+                    BLU.fromString ("(" ++ escape mp ++ ",") <>
+                    implCode <>
+                    BLU.fromString ")"
+
+            Pretty ->
+                T.writeFile (to "pure.raw.py") $
+                    T.pack ("(" ++ escape mp ++ ",") <>
+                      codePretty implCode <>
+                    T.pack ")"
+            
+            Compressed -> do
+              source <- mkEntrySelector "source"
+              srcPath <- mkEntrySelector "srcpath"
+              createArchive (to "pure.zip.py") $ do
+                  addEntry BZip2 (toStrict $ serialize implCode) source
+                  addEntry BZip2 (BSU.fromString mp) srcPath
+
+        T.writeFile (to "pure.py") loaderCode
         return hasForeign
-  
+
   let newModsToImport = map snd (moduleImports module')
   let newFModToAdd = S.fromList [mp | hasForeign]
   return (newModsToImport, newFModToAdd)
@@ -171,22 +205,9 @@ astSSToAbsPath pwd n =
     Just ss ->
       withSourceSpan (ss {P.spanName = joinPath [pwd, SP.spanName ss]}) n
 
-doc2Text :: Doc ann -> T.Text
-doc2Text = renderStrict . layoutPretty defaultLayoutOptions
 
-legalizedCodeGen :: String -> FilePath -> Doc Py -> Text
-legalizedCodeGen mName mPath sexpr =
-    T.unlines
-      [
-        T.pack "from py_sexpr.terms import *"
-      , T.pack "from py_sexpr.stack_vm.emit import module_code"
-      , doc2Text (bindSExpr "res" sexpr)
-      , T.pack $
-          printf
-            "res = module_code(res, filename=%s, name=%s)"
-            (escape mPath)
-            (escape mName)
-      ]
+codePretty :: Doc PrettyTopdown -> T.Text
+codePretty = renderStrict . layoutPretty defaultLayoutOptions
 
 loaderCode :: Text
 loaderCode =

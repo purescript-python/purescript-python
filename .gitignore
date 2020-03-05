@@ -1,11 +1,28 @@
 .stack-work/
 purescript-python.cabal
 *~
-
+.idea/
 stack.yaml.lock
-
 # for making statically built libs
 pspy-blueprint-*.zip
-
+.DS_Store
+stack.yaml.lock
 .DS_Store
 pspy-blueprint
+
+# purescript
+passing/bower_components/
+passing/node_modules/
+passing/.pulp-cache/
+passing/output/
+passing/generated-docs/
+passing/.psc-package/
+passing/.psc*
+passing/.purs*
+passing/.psa*
+passing/.spago
+
+# purescript-python
+passing/.pure-py/
+passing/passing
+passing/**.src.py

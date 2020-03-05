@@ -25,19 +25,6 @@ data SourceLoc
       , filename :: String
       }
 
-escapeImpl :: String -> String -> String
-escapeImpl [] r = r
-escapeImpl (c:cs) r = case c of
-    '"'  -> "\\\"" ++ tl
-    '\\' -> "\\\\" ++ tl
-    _ | C.isPrint c && not (C.isControl c) -> c:tl
-      | otherwise -> C.showLitChar c tl
-    where
-        tl    = escapeImpl cs r
-
-escape :: String -> String
-escape s = '\"' : escapeImpl s "\""
-
 data BoxedName where
     This     :: BoxedName
     Import   :: BoxedName
@@ -60,8 +47,8 @@ mkName text
 
 unbox :: BoxedName -> Maybe String
 unbox = \case
-    UnMangled n -> Just . escape $ T.unpack n
-    Mangled n   -> Just . escape $ "ps_" ++ T.unpack n
+    UnMangled n -> Just $ T.unpack n
+    Mangled n   -> Just $ "ps_" ++ T.unpack n
     _ -> Nothing
 
 pattern Unbox a <- (unbox -> Just a)

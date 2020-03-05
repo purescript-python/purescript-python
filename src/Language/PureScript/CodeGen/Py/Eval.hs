@@ -48,6 +48,7 @@ class EvalJS repr where
     new     :: repr -> [repr] -> repr -- create class
     block   :: [repr] -> repr
     var     :: BoxedName -> repr
+
     intro   :: BoxedName -> repr -> repr
     assign  :: BoxedName -> repr -> repr
 
@@ -67,6 +68,14 @@ class EvalJS repr where
     isa :: repr -> repr -> repr
     comment :: [Text] -> repr -> repr
     located :: SourceLoc -> repr -> repr
+
+recurIndex :: (AST -> Maybe AST) -> AST -> (Int, AST)
+recurIndex f ast =
+    case f ast of
+        Nothing -> (0, ast)
+        Just inner ->
+            let (j, inner') = recurIndex f inner
+            in (1 + j, inner')
 
 finally :: EvalJS repr => AST -> repr
 finally n = loc $ case n of
@@ -93,10 +102,40 @@ finally n = loc $ case n of
         func (fmap mkName n) (map mkName args) $ finally body
 
     Indexer _ (Attr ps) base ->
-        getAttr (finally base) (decodeStringWithReplacement ps)
+        let tryRecur = \case
+                Indexer _ (Attr ps') base' | ps == ps' -> Just base
+                Comment _ _ exp -> tryRecur exp
+                _ -> Nothing
+            (depth, inner) = recurIndex tryRecur base
+        in
+        if depth == 0 then
+            getAttr (finally base) (decodeStringWithReplacement ps)
+        else
+            -- this is for speed up compilation
+            app (var "$getattr_looper") [intLit (toInteger depth + 1), finally inner, strLit (decodeStringWithReplacement ps)]
+
+
 
     Indexer _ item base ->
-        getItem (finally base) (finally item)
+        let (depth, inner)
+                | StringLiteral _ item' <- item =
+                    let tryRecur = \case
+                            Indexer _ (Attr _) _ -> Nothing
+                            Indexer _ (StringLiteral _ item'') inner | item'' == item' ->
+                                Just inner
+                            Comment _ _ exp -> tryRecur exp
+                            _ -> Nothing
+                    in recurIndex tryRecur base
+                | otherwise = (0, base)
+        in
+        if depth == 0 then
+            getItem (finally base) (finally item)
+        else
+            -- this is for speed up compilation
+            app (var "$getitem_looper") [intLit (toInteger depth + 1), finally inner, finally item]
+
+
+
 
     Assignment _ (Indexer _ (Attr ps) base) rhs ->
         setAttr (finally base) (decodeStringWithReplacement ps) (finally rhs)
@@ -154,7 +193,13 @@ finally n = loc $ case n of
              BlockComment x -> x
         in comment (map f cs) (finally exp)
 
-    where loc | Just loc <- getSourceSpan n = located $ takeSourceLoc loc
+    where loc | Just loc <- getSourceSpan n =
+                    let loc' = takeSourceLoc loc
+                    in  if line loc' == 0 then id
+                            -- This is actually invalid line number,
+                            -- and will break the support of Python 3.5.
+                        else
+                            located loc'
               | otherwise = id
 
 takeSourceLoc
@@ -166,6 +211,7 @@ takeSourceLoc
             , sourcePosColumn = col
             }
         }
-     = let line = line' + 1 in
+     =
+        let line = line' + 1 in
         -- Issue #8
         SourceLoc {line, col, filename}

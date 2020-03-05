@@ -1,5 +1,5 @@
 name: purescript-python
-version: 0.1.1.0
+version: 0.1.2.0
 github: "purescript-python/purescript-python"
 license: LGPL-3
 author: "Taine Zhao"
@@ -41,8 +41,12 @@ dependencies:
   - utf8-string >=1 && <2
   - purescript
   - prettyprinter
+  - bytestring-conversion
+  - utf8-string
+  - zip
 
 default-extensions:
+  - GADTs
   - ViewPatterns
   - DeriveGeneric
   - DeriveFunctor
@@ -97,9 +101,9 @@ executables:
     dependencies:
       - purescript-python
 
-#tests:
-#  purescript-python-test:
-#    main: Spec.hs
-#    source-dirs: test
-#    dependencies:
-#      - purescript-python
+tests:
+  purescript-python-test:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - purescript-python

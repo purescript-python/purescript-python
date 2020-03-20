@@ -7,6 +7,8 @@ import TestCases.Records (testRecords)
 import Effect (Effect)
 import Effect.Class.Console (log)
 import Test.Unfoldable (testUnfoldable)
+import Test.ST (testST)
+import Test.UnsafeCoerce (testUnsafeCoerce)
 
 main :: Effect Unit
 main = do
@@ -15,3 +17,5 @@ main = do
   testRecords
   log "CI tests passing!"
   testUnfoldable
+  testST
+  testUnsafeCoerce

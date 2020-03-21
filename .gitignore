@@ -9,6 +9,8 @@ pspy-blueprint-*.zip
 stack.yaml.lock
 .DS_Store
 pspy-blueprint
+.psc-ide-port
+output/
 
 # purescript
 passing/bower_components/

@@ -9,6 +9,10 @@ import Effect.Class.Console (log)
 import Test.Unfoldable (testUnfoldable)
 import Test.ST (testST)
 import Test.UnsafeCoerce (testUnsafeCoerce)
+import Test.Arrays (testArrays)
+import Data.Array as A
+import Data.Maybe (Maybe(..))
+-- import Test.OrderedCollections (testOrderedCollections)
 
 main :: Effect Unit
 main = do
@@ -19,3 +23,5 @@ main = do
   testUnfoldable
   testST
   testUnsafeCoerce
+  testArrays
+--   testOrderedCollections

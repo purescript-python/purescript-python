@@ -10,6 +10,8 @@ import Test.Unfoldable (testUnfoldable)
 import Test.ST (testST)
 import Test.UnsafeCoerce (testUnsafeCoerce)
 import Test.Arrays (testArrays)
+import Data.Array as A
+import Data.Maybe (Maybe(..))
 -- import Test.OrderedCollections (testOrderedCollections)
 
 main :: Effect Unit

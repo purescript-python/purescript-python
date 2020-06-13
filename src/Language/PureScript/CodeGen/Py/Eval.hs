@@ -112,9 +112,7 @@ finally n = loc $ case n of
             getAttr (finally base) (decodeStringWithReplacement ps)
         else
             -- this is for speed up compilation
-            app (var "$getattr_looper") [intLit (toInteger depth + 1), finally inner, strLit (decodeStringWithReplacement ps)]
-
-
+            app (var "special@getattr_looper") [intLit (toInteger depth + 1), finally inner, strLit (decodeStringWithReplacement ps)]
 
     Indexer _ item base ->
         let (depth, inner)
@@ -132,10 +130,7 @@ finally n = loc $ case n of
             getItem (finally base) (finally item)
         else
             -- this is for speed up compilation
-            app (var "$getitem_looper") [intLit (toInteger depth + 1), finally inner, finally item]
-
-
-
+            app (var "special@getitem_looper") [intLit (toInteger depth + 1), finally inner, finally item]
 
     Assignment _ (Indexer _ (Attr ps) base) rhs ->
         setAttr (finally base) (decodeStringWithReplacement ps) (finally rhs)

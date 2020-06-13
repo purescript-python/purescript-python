@@ -177,15 +177,21 @@ cg outFormat baseOutDir coreFnMN = do
 
 runToModulePath ::  [FilePath] -> [FilePath] -> P.ModuleName -> String
 runToModulePath prefix suffix (P.ModuleName pns) =
-        joinPath .
-        (prefix++) . (++suffix) .
-        map T.unpack $ (P.runProperName <$> pns)
+    joinPath
+      . (prefix++)
+      . (++suffix)
+      . List.map T.unpack
+      . T.splitOn (T.pack ".")
+      $ pns
 
 runModuleName ::  [FilePath] -> [FilePath] -> P.ModuleName -> String
 runModuleName prefix suffix (P.ModuleName pns) =
-        List.intercalate "." .
-        (prefix++) . (++suffix) .
-        map T.unpack $ (P.runProperName <$> pns)
+    List.intercalate "."
+      . (prefix++)
+      . (++suffix)
+      . return
+      . T.unpack
+      $ pns
 
 parseJson :: Text -> Value
 parseJson text

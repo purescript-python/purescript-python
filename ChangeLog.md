@@ -1,5 +1,7 @@
 # Changelog for purescript-python
 
+2020-06-13: Version 0.1.3.0
+
 2020-03-05: Version 0.1.2.0
 ---------------------------------
 

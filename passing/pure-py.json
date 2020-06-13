@@ -3,6 +3,6 @@
   "data-format": "Compressed",
   
   "entry-module": "Test.Main",
-  "index-mirror": "test",
+  "index-mirror": "default",
   "pspy-blueprint": "pspy-blueprint"
 }

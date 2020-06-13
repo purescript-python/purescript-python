@@ -114,8 +114,10 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   pyimport = AST.Var Nothing $ unmangle "import"
 
   runModuleNameImpl :: [Text] -> [Text] -> P.ModuleName -> Text
-  runModuleNameImpl prefix suffix (P.ModuleName pns) =
-    T.intercalate "."  (package:prefix ++ (P.runProperName <$> pns) ++ suffix)
+  runModuleNameImpl prefix suffix (ModuleName pns) =
+    -- pns = ModuleName "a.b.c", according to
+    -- https://github.com/purescript/purescript/pull/3843/files
+    T.intercalate "."  (package:prefix ++ [pns] ++ suffix)
 
   runForeignModuleName = runModuleNameImpl ["ffi"] []
   runModuleName        = runModuleNameImpl [] ["pure"]
@@ -141,7 +143,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
 
     freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
     freshModuleName i mn'@(ModuleName pns) used =
-      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "." <> T.pack (show i)]
+      let newName = ModuleName $ pns <> "." <> T.pack (show i)
       in if Ident (runModuleName newName) `elem` used
          then freshModuleName (i + 1) mn' used
          else newName
@@ -366,7 +368,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
-  qualifiedToJS f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = AST.Var Nothing . runIdent $ f a
+  qualifiedToJS f (Qualified (Just C.Prim) a) = AST.Var Nothing . runIdent $ f a
   qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToPy (f a)
 

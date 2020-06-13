@@ -2,6 +2,7 @@
 
 2020-06-13: Version 0.1.3.0
 
+- one-liner installation!
 - change license to MIT #20
 - update codebase to PureScript v0.13.8 #22
 - fix namespace issues of `getitem_looper` and `getattr_looper`

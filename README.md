@@ -25,7 +25,7 @@
 
 2. Install PureScript-Python components:
 
-   `pip install git+https://github.com/purescript-python/installer`
+   `curl -fsSL https://raw.githubusercontent.com/purescript-python/installer/master/install.sh | bash`
 
 3. Create an empty folder called `hello-world` somewhere appropriate,get in, and call
    ```

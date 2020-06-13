@@ -36,6 +36,6 @@ main = do
   testInt
   testGlobals
   testStringAll
---   testQuickCheck
---   testOrderedCollections
---   log "CI tests passing!"
+  testQuickCheck
+  testOrderedCollections
+  log "CI tests passing!"

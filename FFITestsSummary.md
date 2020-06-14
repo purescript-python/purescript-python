@@ -25,6 +25,7 @@ There is no tests for the following packages in their repos, thus no test for FF
 - `purescript-functions`
 - `purescript-exceptions` (TODO: verify implementation manually due to differences between Python `Exception`s and JS `Error`s)
 - `purescript-effect`
+- `purescript-console`
 
 ## packages with tests but not added to purescript-python/passing yet
 
@@ -32,6 +33,9 @@ There is no tests for the following packages in their repos, thus no test for FF
 - `purescript-prelude`
 - `purescript-control`
 - `purescript-foldable-traversable`
+- `purescript-partial`
+- `purescript-nullable`
+- `purescript-refs`
 
 ## packages with FFI and tests
 
@@ -42,3 +46,7 @@ There is no tests for the following packages in their repos, thus no test for FF
 - `purescript-st`
 - `purescript-unfoldable`
 - `purescript-unsafe-coerce`
+
+## purescript-python only packages
+
+- `purescript-show-python`

@@ -64,7 +64,7 @@ A major motivation for my working on PureScript is its lightweighted but awesome
 
 For VSCode users, installing the plugin `PureScript IDE` and `File -> Preferences -> Settings -> (search purescript) -> Turn on "Add Spago sources"` will be sufficient. **No need to install some GitHub repo and build for 4 hours! And this IDE feels swift!**
 
-## Troubleshot `pspy-blueprint`
+## Troubleshoot `pspy-blueprint`
 
 If `pspy-blueprint` provided by the Python package `purescripto` didn't work(e.g., users of MacOSX < 10.15), you should manually install it from this repository, and currently there're 2 options:
 
@@ -72,3 +72,14 @@ If `pspy-blueprint` provided by the Python package `purescripto` didn't work(e.g
 2. Install from source(Need Haskell [stack](https://docs.haskellstack.org/en/stable/README)): clone this repo, and use command `stack install .`, which will install `pspy-blueprint` to your `.local` PATH.
 
 For Linux users, you might also need to use `chmod u+x <path/to/pspy-blueprint>` to allow the permission to execute.
+
+## Troubleshoot: Execution Not Sync to Latest Code
+
+This seems to be a recent issue produced by the upstream compiler, and you can resolve this by removing the current `output` directory:
+
+```bash
+rm -rf $YOUR_PROJECT_ROOT/output && spago build && pspy --run
+```
+
+This will produce the result of your latest code.
+

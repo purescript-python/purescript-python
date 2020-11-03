@@ -75,7 +75,8 @@ moduleToJS
   => Module Ann
   -> Text
   -> m (Bool, AST)
-moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
+            
+moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -83,7 +84,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     jsDecls <- mapM bindToJs decls
     optimized <- traverse (traverse optimize) jsDecls
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
-    let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+    let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized `S.union` M.keysSet reExps
     jsImports <- traverse (importToJs mnLookup)
       . filter (`S.member` usedModuleNames)
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
@@ -103,8 +104,10 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
 
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
+    let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToPy) standardExps
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps
+                               ++ concatMap (reExportPairs mnLookup) reExps'
     let exportObj = [AST.Assignment Nothing (AST.Var Nothing $ unmangle "exports") exps']
     return (hasForeign, AST.Block Nothing $ moduleBody ++ exportObj)
 
@@ -126,6 +129,21 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   getNames :: Bind Ann -> [Ident]
   getNames (NonRec _ ident _) = [ident]
   getNames (Rec vals) = map (snd . fst) vals
+
+  -- | Generate code in the JavaScript IR for re-exported declarations, prepending
+  -- the module name from whence it was imported.
+  reExportPairs :: M.Map ModuleName (Ann, ModuleName) -> (ModuleName, [Ident]) -> [(PSString, AST)]
+  reExportPairs mnLookup (mn', idents) =
+    let toExportedMember :: Ident -> AST
+        toExportedMember =
+          maybe
+            (AST.Var Nothing . identToJs)
+            (flip accessor . AST.Var Nothing . moduleNameToJs . snd)
+            (M.lookup mn' mnLookup)
+    in
+      map
+        (mkString . runIdent &&& toExportedMember)
+        idents
 
   -- | Creates alternative names for each module to ensure they don't collide
   -- with declaration names.

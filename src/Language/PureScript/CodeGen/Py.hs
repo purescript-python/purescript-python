@@ -54,7 +54,7 @@ import Language.PureScript.Names hiding (runModuleName)
 import Language.PureScript.Options
 import Language.PureScript.PSString (PSString, mkString, decodeStringWithReplacement)
 import Language.PureScript.Traversals (sndM)
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 import Language.PureScript.CodeGen.Py.Common (unmangle)
 import Language.PureScript.CodeGen.Py.Naming (identToPy)
@@ -75,7 +75,7 @@ moduleToJS
   => Module Ann
   -> Text
   -> m (Bool, AST)
-moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
+moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -84,6 +84,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     optimized <- traverse (traverse optimize) jsDecls
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+          `S.union` M.keysSet reExps
     jsImports <- traverse (importToJs mnLookup)
       . filter (`S.member` usedModuleNames)
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
@@ -100,11 +101,12 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     let hasForeign = not $ null foreigns
     let foreign' = [foreignImport | hasForeign]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
-
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
+    let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToPy) standardExps
-                               ++ map (mkString . runIdent &&& foreignIdent) foreignExps
+                    ++ map (mkString . runIdent &&& foreignIdent) foreignExps
+                    ++ concatMap (reExportPairs mnLookup) reExps'
     let exportObj = [AST.Assignment Nothing (AST.Var Nothing $ unmangle "exports") exps']
     return (hasForeign, AST.Block Nothing $ moduleBody ++ exportObj)
 
@@ -127,6 +129,21 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   getNames (NonRec _ ident _) = [ident]
   getNames (Rec vals) = map (snd . fst) vals
 
+  -- | Generate code in the JavaScript IR for re-exported declarations, prepending
+  -- the module name from whence it was imported.
+  reExportPairs :: M.Map ModuleName (Ann, ModuleName) -> (ModuleName, [Ident]) -> [(PSString, AST)]
+  reExportPairs mnLookup (mn', idents) =
+    let toExportedMember :: Ident -> AST
+        toExportedMember =
+          maybe
+            (AST.Var Nothing . identToJs)
+            (flip accessor . AST.Var Nothing . moduleNameToJs . snd)
+            (M.lookup mn' mnLookup)
+    in
+      map
+        (mkString . runIdent &&& toExportedMember)
+        idents
+  
   -- | Creates alternative names for each module to ensure they don't collide
   -- with declaration names.
   renameImports :: [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
@@ -134,7 +151,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     where
     go :: M.Map ModuleName (Ann, ModuleName) -> [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
     go acc used ((ann, mn') : mns') =
-      let mni = Ident $ runModuleName mn'
+      let mni = Ident $ moduleNameToJs mn'
       in if mn' /= mn && mni `elem` used
          then let newName = freshModuleName 1 mn' used
               in go (M.insert mn' (ann, newName) acc) (Ident (runModuleName newName) : used) mns'
@@ -189,6 +206,7 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
   -- Generate code in the simplified JavaScript intermediate representation for a declaration
   --
   bindToJs :: Bind Ann -> m [AST]
+  bindToJs (NonRec (_, _, _, Just IsTypeClassConstructor) _ _) = pure []
   bindToJs (NonRec ann ident val) = return <$> nonRecToJS ann ident val
   bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToJS)
 
@@ -255,16 +273,6 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     obj <- valueToJs o
     sts <- mapM (sndM valueToJs) ps
     extendObj obj sts
-  valueToJs' e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
-    let args = unAbs e
-    in return $ AST.Function Nothing Nothing (map identToPy args ++ [thisName]) (AST.Block Nothing $ map assign args ++ [this])
-    where
-    unAbs :: Expr Ann -> [Ident]
-    unAbs (Abs _ arg val) = arg : unAbs val
-    unAbs _ = []
-    assign :: Ident -> AST
-    assign name = AST.Assignment Nothing (indexerString (mkString $ runIdent name) this)
-                               (var name)
   valueToJs' (Abs _ arg val) = do
     ret <- valueToJs val
     let jsArg = case arg of
@@ -277,8 +285,6 @@ moduleToJS (Module _ coms mn _ imps exps foreigns decls) package =
     case f of
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-        return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
-      Var (_, _, _, Just IsTypeClassConstructor) name ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
     where

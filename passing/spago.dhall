@@ -15,7 +15,7 @@ You can edit this file as you like.
   , "exceptions"
   , "foldable-traversable"
   , "foreign"
-  , "globals"
+  , "record"
   , "math"
   , "maybe"
   , "ordered-collections"

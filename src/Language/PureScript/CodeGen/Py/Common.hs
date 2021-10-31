@@ -6,9 +6,10 @@ module Language.PureScript.CodeGen.Py.Common where
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Char as C
-import Text.Printf (printf)
+-- import qualified Data.Char as C
+-- import Text.Printf (printf)
 
+unmanglePrefix :: Text
 unmanglePrefix = "special@"
 
 -- | unmangle or specialize names
@@ -16,6 +17,8 @@ unmanglePrefix = "special@"
 --   - __all__
 --   - import
 --   - this
+
+unmangle :: Text -> Text
 unmangle = T.append unmanglePrefix
 
 data SourceLoc
@@ -51,4 +54,6 @@ unbox = \case
     Mangled n   -> Just $ "ps_" ++ T.unpack n
     _ -> Nothing
 
+
+pattern Unbox :: String -> BoxedName
 pattern Unbox a <- (unbox -> Just a)

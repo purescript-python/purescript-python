@@ -4,7 +4,7 @@ github: "purescript-python/purescript-python"
 license: MIT
 author: "Taine Zhao"
 maintainer: "twshere@outlook.com"
-copyright: "2020 Taine Zhao"
+copyright: "2021 Taine Zhao"
 
 extra-source-files:
   - README.md
@@ -20,29 +20,29 @@ extra-source-files:
 description: Please see the README on GitHub at <https://github.com/purescript-python/purescript-python#readme>
 
 dependencies:
-  - aeson >=1.0 && <1.5
-  - aeson-better-errors >=0.8
-  - aeson-pretty
-  - base >=4.11 && <4.13
-  - base-compat >=0.6.0
-  - bytestring
-  - containers
-  - directory >=1.2.3
-  - filepath
-  - monad-control >=1.0.0.0 && <1.1
-  - monad-logger >=0.3 && <0.4
-  - mtl >=2.1.0 && <2.3.0
-  - protolude >=0.1.6 && <0.2.4
-  - semigroups >=0.16.2 && <0.19
-  - text
-  - transformers >=0.3.0 && <0.6
-  - transformers-base >=0.4.0 && <0.5
-  - transformers-compat >=0.3.0
-  - utf8-string >=1 && <2
+  - aeson >=1.5.6.0 && <1.6
+  - aeson-better-errors >=0.9.1.0 && <0.10
+  - aeson-pretty >=0.8.8 && <0.9
+  - base >=4.14.1.0 && <4.15
+  - base-compat >=0.11.2 && <0.12
+  - bytestring >=0.10.12.0 && <0.11
+  - containers >=0.6.2.1 && <0.7
+  - directory >=1.3.6.0 && <1.4
+  - filepath >=1.4.2.1 && <1.5
+  - monad-control >=1.0.2.3 && <1.1
+  - monad-logger >=0.3.36 && <0.4
+  - mtl >=2.2.2 && <2.3
+  - protolude >=0.3.0 && <0.4
+  - semigroups >=0.19.1 && <0.20
+  - text >=1.2.4.1 && <1.3
+  - transformers >=0.5.6.2 && <0.6
+  - transformers-base >=0.4.5.2 && <0.5
+  - transformers-compat >=0.6.6 && <0.7
+  - utf8-string >=1.0.2 && <1.1
   - purescript
+  - purescript-cst
   - prettyprinter
   - bytestring-conversion
-  - utf8-string
   - zip
 
 default-extensions:
@@ -77,12 +77,27 @@ default-extensions:
 when:
   - condition: os(darwin)
     then:
-      ghc-options: -Wall -O2
+      ghc-options:
+      - -O2
+      - -O2 -static
+      - -fno-warn-unused-imports
+      - -fno-warn-name-shadowing
+      - -fno-warn-missing-signatures
+      - -fno-warn-missing-pattern-synonym-signatures
+      - -fno-warn-unused-matches
+      - -fno-warn-orphans
       ld-options:
       - -pthread
       - -Wall
     else:
-      ghc-options: -Wall -O2 -static
+      ghc-options:
+      - -O2 -static
+      - -fno-warn-unused-imports
+      - -fno-warn-name-shadowing
+      - -fno-warn-missing-signatures
+      - -fno-warn-missing-pattern-synonym-signatures
+      - -fno-warn-unused-matches
+      - -fno-warn-orphans
       cc-options: -static
       ld-options:
       - -static

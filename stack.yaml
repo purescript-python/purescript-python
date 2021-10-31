@@ -1,17 +1,28 @@
-resolver: lts-13.26
-pvp-bounds: upper
+resolver: lts-17.6
+pvp-bounds: both
 packages:
 - '.'
+ghc-options:
+  # Build with advanced optimizations enabled by default
+  "$locals": -O2 -Werror
 extra-deps:
-- purescript-0.13.8@sha256:c2855514c6f7da4b5f5e3b1020597111d2982b69f460d1c33b7e9f6c9ea8159c,57030
-- happy-1.19.9
 - language-javascript-0.7.0.0
-- network-3.0.1.1
-- these-1.0.1
-- semialign-1
+- purescript-0.14.5@sha256:511f50e7f267b65e1f656cdff9f9665073496efdf4375a3a86aa68496dae7281,18623
+- purescript-cst-0.4.0.0@sha256:bfe7be3962e83b645a4a8cd1805f31de17db3d3456962e1a2d17016fe5d7f96d,3861
+
+nix:
+  enable: false
+  packages:
+  - zlib
+  # Test dependencies
+  - nodejs
+  - nodePackages.npm
+  - nodePackages.bower
 flags:
   aeson-pretty:
     lib-only: true
   these:
     assoc: false
-    quickcheck: false
+  haskeline:
+    # Avoids a libtinfo dynamic library dependency
+    terminfo: false

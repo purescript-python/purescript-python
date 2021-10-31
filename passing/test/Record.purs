@@ -2,11 +2,11 @@ module Test.Record (testRecord) where
 
 import Prelude
 import Effect (Effect)
-import Record (delete, equal, get, insert, merge, modify, rename, set)
-import Record.Builder as Builder
+import Data.Record (delete, equal, get, insert, merge, modify, rename, set)
+import Data.Record.Builder as Builder
 import Control.Monad.ST (run) as ST
-import Record.ST (poke, thaw, freeze, modify) as ST
-import Record.Unsafe (unsafeHas)
+import Data.Record.ST (poke, thaw, freeze, modify) as ST
+import Data.Record.Unsafe (unsafeHas)
 import Data.Symbol (SProxy(..))
 import Test.Assert (assert')
 

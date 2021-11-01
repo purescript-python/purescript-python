@@ -1,17 +1,21 @@
 .stack-work/
 purescript-python.cabal
+impurescript-psdiana.cabal
+psdiana
+
 *~
 .idea/
 stack.yaml.lock
 # for making statically built libs
 pspy-blueprint-*.zip
+psdiana-*.zip
+
 .DS_Store
 stack.yaml.lock
 .DS_Store
 pspy-blueprint
 .psc-ide-port
 output/
-
 # purescript
 passing/bower_components/
 passing/node_modules/

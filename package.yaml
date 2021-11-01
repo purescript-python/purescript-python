@@ -1,6 +1,6 @@
-name: purescript-python
+name: impurescript-diana
 version: 0.1.3.0
-github: "purescript-python/purescript-python"
+github: "thautwarm/impurescript-diana"
 license: MIT
 author: "Taine Zhao"
 maintainer: "twshere@outlook.com"
@@ -110,15 +110,8 @@ library:
   source-dirs: src
 
 executables:
-  pspy-blueprint:
+  psdiana:
     main: Main.hs
     source-dirs: app
     dependencies:
-      - purescript-python
-
-tests:
-  purescript-python-test:
-    main: Spec.hs
-    source-dirs: test
-    dependencies:
-      - purescript-python
+      - impurescript-diana

@@ -1,8 +1,0 @@
-{
-  "corefn-dir": "output",
-  "data-format": "Compressed",
-  
-  "entry-module": "Test.Main",
-  "index-mirror": "default",
-  "pspy-blueprint": "pspy-blueprint"
-}

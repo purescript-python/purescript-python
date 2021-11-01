@@ -3,7 +3,7 @@
     , PatternSynonyms
 #-}
 
-module Language.PureScript.CodeGen.Py.Eval where
+module Language.PureScript.CodeGen.Diana.Eval where
 
 
 import System.FilePath ((</>))
@@ -11,7 +11,7 @@ import System.FilePath ((</>))
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.Comments (Comment(..))
-import Language.PureScript.CodeGen.Py.Common (BoxedName, SourceLoc(..), mkName)
+import Language.PureScript.CodeGen.Diana.Common (BoxedName(..), SourceLoc(..), mkName)
 import Language.PureScript.PSString (PSString, decodeStringWithReplacement)
 
 import Data.Text (Text)
@@ -22,6 +22,7 @@ import Text.Printf (printf)
 import Control.Monad.State
 import Control.Applicative
 import Control.Arrow ((&&&))
+
 
 pattern Attr ps <- ArrayLiteral _ [StringLiteral _ ps]
 
@@ -49,17 +50,15 @@ class EvalJS repr where
     block   :: [repr] -> repr
     var     :: BoxedName -> repr
 
-    intro   :: BoxedName -> repr -> repr
+    intro   :: BoxedName -> Maybe repr -> repr
     assign  :: BoxedName -> repr -> repr
 
     while    :: repr -> repr -> repr
-    upRecord :: repr -> repr -> repr
     forRange :: BoxedName -> repr -> repr -> repr -> repr
     -- [forIn]
     --  used only for iterating records:
     --    github.com/purescript/purescript@master
     --    src/Language/PureScript/CodeGen/JS.hs
-    forIn   :: BoxedName -> repr -> repr -> repr
 
     ite :: repr -> repr -> Maybe repr -> repr
     ret :: repr -> repr
@@ -67,7 +66,7 @@ class EvalJS repr where
     throw :: repr -> repr
     isa :: repr -> repr -> repr
     comment :: [Text] -> repr -> repr
-    located :: SourceLoc -> repr -> repr
+    located :: SourceLoc -> Bool -> repr -> repr
 
 recurIndex :: (AST -> Maybe AST) -> AST -> (Int, AST)
 recurIndex f ast =
@@ -76,6 +75,8 @@ recurIndex f ast =
         Just inner ->
             let (j, inner') = recurIndex f inner
             in (1 + j, inner')
+
+
 
 finally :: EvalJS repr => AST -> repr
 finally n = loc $ case n of
@@ -98,39 +99,18 @@ finally n = loc $ case n of
     ObjectLiteral _ xs ->
         objLit $ map (decodeStringWithReplacement . fst &&& finally . snd) xs
 
-    Function _ n args body ->
-        func (fmap mkName n) (map mkName args) $ finally body
+    Function _ (Just fn) args body
+        | T.isPrefixOf "😘" fn -> func (Just $ mkName (T.tail fn)) (This : map mkName args) $ finally body
+        | otherwise -> func (Just $ mkName fn) (map mkName args) $ finally body
+
+    Function _ Nothing args body ->
+        func Nothing (map mkName args) $ finally body
 
     Indexer _ (Attr ps) base ->
-        let tryRecur = \case
-                Indexer _ (Attr ps') base' | ps == ps' -> Just base
-                Comment _ _ exp -> tryRecur exp
-                _ -> Nothing
-            (depth, inner) = recurIndex tryRecur base
-        in
-        if depth == 0 then
-            getAttr (finally base) (decodeStringWithReplacement ps)
-        else
-            -- this is for speed up compilation
-            app (var "special@getattr_looper") [intLit (toInteger depth + 1), finally inner, strLit (decodeStringWithReplacement ps)]
+        getAttr (finally base) (decodeStringWithReplacement ps)
 
     Indexer _ item base ->
-        let (depth, inner)
-                | StringLiteral _ item' <- item =
-                    let tryRecur = \case
-                            Indexer _ (Attr _) _ -> Nothing
-                            Indexer _ (StringLiteral _ item'') inner | item'' == item' ->
-                                Just inner
-                            Comment _ _ exp -> tryRecur exp
-                            _ -> Nothing
-                    in recurIndex tryRecur base
-                | otherwise = (0, base)
-        in
-        if depth == 0 then
-            getItem (finally base) (finally item)
-        else
-            -- this is for speed up compilation
-            app (var "special@getitem_looper") [intLit (toInteger depth + 1), finally inner, finally item]
+        getItem (finally base) (finally item)
 
     Assignment _ (Indexer _ (Attr ps) base) rhs ->
         setAttr (finally base) (decodeStringWithReplacement ps) (finally rhs)
@@ -142,9 +122,6 @@ finally n = loc $ case n of
 
     Assignment _ lhs _ -> error $ show lhs
 
-    App _ (Indexer _ (Attr "special@record_update") old) [new] ->
-        upRecord (finally old) (finally new)
-
     App _ f args ->
         app (finally f) (map finally args)
 
@@ -154,19 +131,18 @@ finally n = loc $ case n of
     Block _ xs -> block $ map finally xs
 
     VariableIntroduction _ n Nothing ->
-        intro (mkName n) none
+        intro (mkName n) Nothing
 
     VariableIntroduction _ n (Just it) ->
-        intro (mkName n) (finally it)
+        intro (mkName n) $ Just (finally it)
 
     While _ cond body ->
         while (finally cond) (finally body)
 
-    For _ n low high body ->
+    For _ n low high body -> -- this seems to be not allowed as well
         forRange (mkName n) (finally low) (finally high) (finally body)
 
-    ForIn _ n itr body ->
-        forIn (mkName n) (finally itr) (finally body)
+    ForIn _ n itr body -> error "transformation for JavaScript forIn not allowed!"
 
     IfElse _ cond te fe ->
         ite (finally cond) (finally te) (fmap finally fe)
@@ -194,7 +170,7 @@ finally n = loc $ case n of
                             -- This is actually invalid line number,
                             -- and will break the support of Python 3.5.
                         else
-                            located loc'
+                            located loc' (isStmt n)
               | otherwise = id
 
 takeSourceLoc
@@ -210,3 +186,15 @@ takeSourceLoc
         let line = line' + 1 in
         -- Issue #8
         SourceLoc {line, col, filename}
+
+
+isStmt :: AST -> Bool
+isStmt a = case a of
+    While {} -> True
+    Comment {} -> True
+    ForIn {} -> True
+    For {} -> True
+    VariableIntroduction {} -> True
+    Assignment {} -> True
+    Block _ _ -> True
+    _ -> False

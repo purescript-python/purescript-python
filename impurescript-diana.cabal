@@ -1,0 +1,168 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           impurescript-diana
+version:        0.1.3.0
+description:    Please see the README on GitHub at <https://github.com/purescript-python/purescript-python#readme>
+homepage:       https://github.com/thautwarm/impurescript-diana#readme
+bug-reports:    https://github.com/thautwarm/impurescript-diana/issues
+author:         Taine Zhao
+maintainer:     twshere@outlook.com
+copyright:      2021 Taine Zhao
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/thautwarm/impurescript-diana
+
+library
+  exposed-modules:
+      Language.PureScript.CodeGen.Diana
+      Language.PureScript.CodeGen.Diana.Common
+      Language.PureScript.CodeGen.Diana.Eval
+      Language.PureScript.CodeGen.Diana.Naming
+      Language.PureScript.CodeGen.Diana.Serializer
+      Monads.STEither
+      StringEscape
+  other-modules:
+      Paths_impurescript_diana
+  hs-source-dirs:
+      src
+  default-extensions:
+      GADTs
+      ViewPatterns
+      DeriveGeneric
+      DeriveFunctor
+      DeriveTraversable
+      LambdaCase
+      TemplateHaskell
+      DuplicateRecordFields
+      StandaloneDeriving
+      ExistentialQuantification
+      MultiParamTypeClasses
+      NamedFieldPuns
+      PartialTypeSignatures
+      FlexibleInstances
+      ConstraintKinds
+      DataKinds
+      DeriveFoldable
+      DerivingStrategies
+      EmptyDataDecls
+      FlexibleContexts
+      KindSignatures
+      PatternGuards
+      PatternSynonyms
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      TupleSections
+  build-depends:
+      aeson >=1.5.6.0 && <1.6
+    , aeson-better-errors >=0.9.1.0 && <0.10
+    , aeson-pretty >=0.8.8 && <0.9
+    , base >=4.14.1.0 && <4.15
+    , base-compat >=0.11.2 && <0.12
+    , bytestring >=0.10.12.0 && <0.11
+    , bytestring-conversion
+    , containers >=0.6.2.1 && <0.7
+    , directory >=1.3.6.0 && <1.4
+    , filepath >=1.4.2.1 && <1.5
+    , monad-control >=1.0.2.3 && <1.1
+    , monad-logger >=0.3.36 && <0.4
+    , mtl >=2.2.2 && <2.3
+    , prettyprinter
+    , protolude >=0.3.0 && <0.4
+    , purescript
+    , purescript-cst
+    , semigroups >=0.19.1 && <0.20
+    , text >=1.2.4.1 && <1.3
+    , transformers >=0.5.6.2 && <0.6
+    , transformers-base >=0.4.5.2 && <0.5
+    , transformers-compat >=0.6.6 && <0.7
+    , utf8-string >=1.0.2 && <1.1
+    , zip
+  if os(darwin)
+    ghc-options: -O2 -O2 -static -fno-warn-unused-imports -fno-warn-name-shadowing -fno-warn-missing-signatures -fno-warn-missing-pattern-synonym-signatures -fno-warn-unused-matches -fno-warn-orphans
+    ld-options: -pthread -Wall
+  else
+    ghc-options: -O2 -static -fno-warn-unused-imports -fno-warn-name-shadowing -fno-warn-missing-signatures -fno-warn-missing-pattern-synonym-signatures -fno-warn-unused-matches -fno-warn-orphans
+    cc-options: -static
+    ld-options: -static -pthread -Wall
+  default-language: Haskell2010
+
+executable psdiana
+  main-is: Main.hs
+  other-modules:
+      Paths_impurescript_diana
+  hs-source-dirs:
+      app
+  default-extensions:
+      GADTs
+      ViewPatterns
+      DeriveGeneric
+      DeriveFunctor
+      DeriveTraversable
+      LambdaCase
+      TemplateHaskell
+      DuplicateRecordFields
+      StandaloneDeriving
+      ExistentialQuantification
+      MultiParamTypeClasses
+      NamedFieldPuns
+      PartialTypeSignatures
+      FlexibleInstances
+      ConstraintKinds
+      DataKinds
+      DeriveFoldable
+      DerivingStrategies
+      EmptyDataDecls
+      FlexibleContexts
+      KindSignatures
+      PatternGuards
+      PatternSynonyms
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      TupleSections
+  build-depends:
+      aeson >=1.5.6.0 && <1.6
+    , aeson-better-errors >=0.9.1.0 && <0.10
+    , aeson-pretty >=0.8.8 && <0.9
+    , base >=4.14.1.0 && <4.15
+    , base-compat >=0.11.2 && <0.12
+    , bytestring >=0.10.12.0 && <0.11
+    , bytestring-conversion
+    , containers >=0.6.2.1 && <0.7
+    , directory >=1.3.6.0 && <1.4
+    , filepath >=1.4.2.1 && <1.5
+    , impurescript-diana
+    , monad-control >=1.0.2.3 && <1.1
+    , monad-logger >=0.3.36 && <0.4
+    , mtl >=2.2.2 && <2.3
+    , prettyprinter
+    , protolude >=0.3.0 && <0.4
+    , purescript
+    , purescript-cst
+    , semigroups >=0.19.1 && <0.20
+    , text >=1.2.4.1 && <1.3
+    , transformers >=0.5.6.2 && <0.6
+    , transformers-base >=0.4.5.2 && <0.5
+    , transformers-compat >=0.6.6 && <0.7
+    , utf8-string >=1.0.2 && <1.1
+    , zip
+  if os(darwin)
+    ghc-options: -O2 -O2 -static -fno-warn-unused-imports -fno-warn-name-shadowing -fno-warn-missing-signatures -fno-warn-missing-pattern-synonym-signatures -fno-warn-unused-matches -fno-warn-orphans
+    ld-options: -pthread -Wall
+  else
+    ghc-options: -O2 -static -fno-warn-unused-imports -fno-warn-name-shadowing -fno-warn-missing-signatures -fno-warn-missing-pattern-synonym-signatures -fno-warn-unused-matches -fno-warn-orphans
+    cc-options: -static
+    ld-options: -static -pthread -Wall
+  default-language: Haskell2010

@@ -2,7 +2,7 @@ module Main where
 import System.Exit
 import System.Environment
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
-import System.FilePath ((</>), joinPath, takeFileName)
+import System.FilePath ((</>), joinPath, takeFileName, stripExtension)
 
 import Data.Aeson hiding (Options)
 import Data.Aeson.Types hiding (Options)
@@ -57,6 +57,9 @@ import Codec.Archive.Zip
 import StringEscape (escape)
 import Control.Monad.State (State)
 import Language.PureScript.CodeGen.Diana.Serializer (runDoc)
+import qualified System.Directory as T
+import Control.Monad (unless)
+import Data.Maybe
 
 instance MonadReader Options (STEither Options MultipleErrors) where
     ask = STEither State.get
@@ -138,6 +141,12 @@ cg  baseOutDir coreFnMN = do
         putStrLn $ "Codegen DianaScript for " ++ qualifiedMN
         createDirectoryIfMissing True outDir
         T.writeFile (to "@main.diana") $ codePretty implCode
+        
+        -- when hasForeign $ do
+        let ffi_file = fromJust (stripExtension ".purs" mp) ++ ".diana"
+        exist_check <- T.doesFileExist ffi_file
+        when exist_check $
+            T.copyFile ffi_file (to "@ffi.diana")
         return hasForeign
 
   let newModsToImport = map snd (moduleImports module')

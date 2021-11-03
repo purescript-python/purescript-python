@@ -58,6 +58,7 @@ import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.CodeGen.Diana.Common (unmangle, SpecialName)
 import Language.PureScript.CodeGen.Diana.Naming (identToDiana, properToDiana, moduleNameToDiana)
 import qualified Language.PureScript.CodeGen.Diana.Common as SpecialName
+import System.FilePath (pathSeparator)
 
 
 unComments :: [Comment] -> Text
@@ -75,7 +76,7 @@ moduleToJS
   => Module Ann
   -> Text
   -> m (Bool, AST)
-moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
+moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -94,11 +95,11 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
                      mk . mkString . unComments $ coms
                | otherwise = mk "No document"
                where mk =  AST.StringLiteral Nothing
-    -- we don't need any rts from dianascript, but a C# module extension
+    
     -- let foreignImport = AST.VariableIntroduction Nothing (unmangle "foreign") $
-    --                     Just $
-    --                       AST.App Nothing pyimport
-    --                         [ AST.StringLiteral Nothing $ mkString $ runForeignModuleName mn ]
+    --                      Just $
+    --                        AST.App Nothing pyimport
+    --                          [ AST.StringLiteral Nothing $ mkString $ runForeignModulePath mn ]
     let hasForeign = not $ null foreigns
     let foreign' = [] -- [foreignImport | hasForeign]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
@@ -106,6 +107,9 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
     let standardExps = exps \\ foreignExps
     let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToDiana) standardExps
+                    -- although foreign symbols are now never qualified and always global
+                    -- we still keep exports because we need to keep correct scope information
+                    -- when accessing module from .NET side.
                     ++ map (mkString . runIdent &&& foreignIdent) foreignExps
                     ++ concatMap (reExportPairs mnLookup) reExps'
     let exportObj = [AST.Assignment Nothing (AST.Var Nothing $ unmangle "exports") exps']
@@ -116,14 +120,15 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
   this     = AST.Var Nothing thisName
   pyimport = AST.Var Nothing $ unmangle SpecialName.importName 
 
-  runModuleNameImpl :: [Text] -> [Text] -> P.ModuleName -> Text
-  runModuleNameImpl prefix suffix (ModuleName pns) =
+  runModuleNameImpl :: Text -> [Text] -> [Text] -> P.ModuleName -> Text
+  runModuleNameImpl sep prefix suffix (ModuleName pns) =
     -- pns = ModuleName "a.b.c", according to
     -- https://github.com/purescript/purescript/pull/3843/files
-    T.intercalate "."  (package:prefix ++ [pns] ++ suffix)
+    T.intercalate sep  (prefix ++ [pns] ++ suffix)
 
-  runForeignModuleName = runModuleNameImpl [] ["@ffi"]
-  runModuleName        = runModuleNameImpl [] ["@main"]
+  -- runForeignModulePath = runModuleNameImpl (T.pack [pathSeparator]) [".."] ["@ffi.diana"]
+  runModulePath        = runModuleNameImpl (T.pack [pathSeparator]) [".."] ["@main.diana"]
+  runModuleName        = runModuleNameImpl "." [] []
 
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
@@ -172,7 +177,7 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
     let moduleBody = AST.App Nothing (AST.Var Nothing $ unmangle SpecialName.importName)
-          [AST.StringLiteral Nothing $ mkString $  runModuleName mn']
+          [AST.StringLiteral Nothing $ mkString $  runModulePath mn']
     withPos ss $ AST.VariableIntroduction Nothing (moduleNameToDiana mnSafe) (Just moduleBody)
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
@@ -293,9 +298,10 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
     unApp (App _ val arg) args = unApp val (arg : args)
     unApp other args = (other, args)
   valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
-    return $ if mn' == mn
-             then foreignIdent ident
-             else varToJs qi
+      return $ foreignIdent ident
+    -- return $ if mn' == mn
+    --          then foreignIdent ident
+    --          else varToJs qi
   valueToJs' (Var (_, _, _, Just IsForeign) ident) =
     internalError $ "Encountered an unqualified reference to a foreign ident " ++ T.unpack (showQualified showIdent ident)
   valueToJs' (Var _ ident) = return $ varToJs ident
@@ -374,7 +380,8 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToDiana (f a)
 
   foreignIdent :: Ident -> AST
-  foreignIdent ident = indexerString (mkString $ runIdent ident) (AST.Var Nothing $ unmangle "foreign")
+  foreignIdent ident = -- accessorString (mkString $ runIdent ident) (AST.Var Nothing $ unmangle "foreign")
+              AST.Var Nothing $ unmangle $ runIdent ident
 
   -- | Generate code in the simplified JavaScript intermediate representation for pattern match binders
   -- and guards.

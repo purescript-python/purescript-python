@@ -52,6 +52,8 @@ namespace Impurescript
 
         static DObj js_new(DObj[] args)
         {
+            if(args.Length < 1)
+                throw new ArgumentException("cannot new with zero arguments.");
             var f = args[0];
             var obj = new Dictionary<DObj, DObj>();
             obj[MK.Int(0)] = f;

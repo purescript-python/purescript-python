@@ -309,9 +309,7 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
     let ctorName = properToDiana ctor
         constructor =
           AST.Function Nothing (Just ctorName) [] $ AST.Block Nothing
-            [ AST.Throw Nothing $
-                AST.App Nothing (AST.Var Nothing $ unmangle "Error") [AST.StringLiteral Nothing $ mkString ctorName]
-            ]
+            [ AST.Throw Nothing $ AST.StringLiteral Nothing $ mkString ctorName ]
         createFn =
           AST.Function Nothing Nothing ["value"]
             (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"])

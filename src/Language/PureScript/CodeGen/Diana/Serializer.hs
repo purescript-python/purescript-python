@@ -41,7 +41,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
             ; return (pretty (escape field) <> pretty ":" <+> o)
             }
     xs <- mapM meach xs
-    return $ align (encloseSep (pretty "{|") (pretty "|}") comma xs)
+    return $ align (encloseSep (pretty "{") (pretty "}") comma xs)
         
   arrayLit xs = do
       xs <- sequence xs
@@ -53,7 +53,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
       Not -> pretty "not" <+> e
       BitwiseNot -> pretty "~" <> e
       Positive -> pretty "+" <> e
-      New -> error "impossible"
+      New -> error "fatal"
 
   binary op l r = do -- actually this will not be called in ImPureScript
     l <- l
@@ -77,7 +77,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
       BitwiseXor -> l <+> pretty "^" <+> r
       ShiftLeft -> l <+> pretty "<<" <+> r
       ShiftRight -> l <+> pretty ">>" <+> r
-      ZeroFillShiftRight -> zeroFillShiftRight <> tupled [l, r]
+      ZeroFillShiftRight -> l <+> pretty ">>" <+> r
 
   getAttr a attr = do
     a <- a
@@ -157,7 +157,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
   isa inst ty = do
     inst <- inst
     ty <- ty
-    return $ inst <> pretty ".TAG" <> pretty "===" <> ty
+    return $ inst <> pretty "[0]" <> pretty "==" <> ty
   comment cs exp = exp
     
   located SourceLoc {line, col, filename} isStmt term = do

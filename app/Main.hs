@@ -137,7 +137,7 @@ cg  baseOutDir coreFnMN = do
 
         putStrLn $ "Codegen DianaScript for " ++ qualifiedMN
         createDirectoryIfMissing True outDir
-        T.writeFile (to "@main.ran") $ codePretty implCode
+        T.writeFile (to "@main.diana") $ codePretty implCode
         return hasForeign
 
   let newModsToImport = map snd (moduleImports module')

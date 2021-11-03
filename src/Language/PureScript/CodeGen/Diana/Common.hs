@@ -13,7 +13,6 @@ import Data.Text.Prettyprint.Doc (Doc, pretty)
 
 class SpecialName a where
   polyDiv :: a
-  zeroFillShiftRight :: a
   newObject :: a
   thisName :: a
   importName :: a
@@ -22,24 +21,22 @@ class SpecialName a where
 
 instance SpecialName Text where
   polyDiv = "div"
-  zeroFillShiftRight = "zfsr32"
   newObject = "new"
   thisName = "this"
   importName = "require"
-  updateRecord = "update"
-  ranger = "range"
+  updateRecord = "Dict.update"
+  ranger = "Enum.range"
 
 prettyText :: Text -> Doc a
 prettyText = pretty
 
 instance SpecialName (Doc a) where
-  polyDiv = prettyText "div"
-  zeroFillShiftRight = prettyText "zfsr32"
-  newObject = prettyText "new"
-  thisName = prettyText "this"
-  importName = prettyText "require"
-  updateRecord = prettyText "update"
-  ranger = prettyText "range"
+  polyDiv = prettyText polyDiv
+  newObject = prettyText newObject
+  thisName = prettyText thisName
+  importName = prettyText importName
+  updateRecord = prettyText updateRecord
+  ranger = prettyText ranger
 
 
 unmanglePrefix :: Text

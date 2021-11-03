@@ -33,19 +33,18 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
   none = return $ pretty "None"
   intLit i = return $ pretty i
   doubleLit f = return $ pretty f
-  strLit s = return $  pretty $ escape s
+  strLit s = return $ pretty $ escape s
   boolLit b = return $ pretty $ if b then "1" else "0"
   objLit xs = do
     let meach (field, o) = do
-            { o <- o 
-            ; return (pretty (escape field) <> pretty ":" <+> o)
-            }
+          o <- o
+          return (pretty (escape field) <> pretty ":" <+> o)
     xs <- mapM meach xs
     return $ align (encloseSep (pretty "{") (pretty "}") comma xs)
-        
+
   arrayLit xs = do
-      xs <- sequence xs
-      return $ list xs
+    xs <- sequence xs
+    return $ list xs
   unary op e = do
     e <- e
     return $ case op of
@@ -55,7 +54,8 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
       Positive -> pretty "+" <> e
       New -> error "fatal"
 
-  binary op l r = do -- actually this will not be called in ImPureScript
+  binary op l r = do
+    -- actually this will not be called in ImPureScript
     l <- l
     r <- r
     return $ case op of
@@ -100,7 +100,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
     let n = case n' of
           Nothing -> T.pack ""
           Just (MustNorm n) -> n
-    return $ vsep [pretty "fun" <+> pretty n <> tupled (map (pretty . forceNorm) args), align $ vsep [ body, pretty "end"]]
+    return $ vsep [pretty "fun" <+> pretty n <> tupled (map (pretty . forceNorm) args), align $ vsep [body, pretty "end"]]
 
   app f args = do
     f <- f
@@ -111,37 +111,43 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
     args <- sequence args
     return $ newObject <> tupled (f : args)
   block suite = do
-    suite <- sequence suite 
+    suite <- sequence suite
     return $ indent 4 $ vsep suite
   var (Normal n) = return $ pretty n
   var This = return thisName
   var Import = return importName
   assign (MustNorm n) v = do
     v <- v
-    return $  pretty n <+> pretty "=" <+> v
-  intro (MustNorm n) Nothing = return $  pretty "var" <+> pretty n
+    return $ pretty n <+> pretty "=" <+> v
+  intro (MustNorm n) Nothing = return $ pretty "var" <+> pretty n
   intro (MustNorm n) (Just it) = do
     it <- it
-    return $ vsep [ pretty "var" <+> pretty n,  pretty n <+> pretty "=" <+>  it ]
+    return $ vsep [pretty "var" <+> pretty n, pretty n <+> pretty "=" <+> it]
   while cond body = do
     cond <- cond
     body <- body
-    return $ vsep [
-      pretty "while" <+> cond <+> pretty "do",
-      align $ vsep[ body
-                  , pretty "end"]]
+    return $
+      vsep
+        [ pretty "while" <+> cond <+> pretty "do",
+          align $
+            vsep
+              [ body,
+                pretty "end"
+              ]
+        ]
   forRange (MustNorm n) low high body = do
     low <- low
     high <- high
     body <- body
-    return $ vsep
-      [ pretty "for" <+> pretty "n" <+> pretty "in" <+> ranger <> tupled [low, high] <+> pretty "do"
-      , align $ vsep [body, pretty "end"]
-      ]
+    return $
+      vsep
+        [ pretty "for" <+> pretty "n" <+> pretty "in" <+> ranger <> tupled [low, high] <+> pretty "do",
+          align $ vsep [body, pretty "end"]
+        ]
   ite cond te Nothing = do
     cond <- cond
     te <- te
-    return $ vsep [pretty "if" <+> cond <+> pretty "then", align $ vsep [ te, pretty "end"]]
+    return $ vsep [pretty "if" <+> cond <+> pretty "then", align $ vsep [te, pretty "end"]]
   ite cond te (Just fe) = do
     cond <- cond
     te <- te
@@ -159,31 +165,40 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
     ty <- ty
     return $ inst <> pretty "[0]" <> pretty "==" <> ty
   comment cs exp = exp
-    
+
   located SourceLoc {line, col, filename} isStmt term = do
     m <- get
-    let op | Just v <- M.lookup filename m  = return v
-           | otherwise = do
-              let i = M.size m
-              put $ M.insert filename i m
-              return i
+    let op
+          | Just v <- M.lookup filename m = return v
+          | otherwise = do
+            let i = M.size m
+            put $ M.insert filename i m
+            return i
     i <- op
     term <- term
-    if isStmt then
-      return $ pretty "__META" <+> pretty i
-               <> pretty ":" <> pretty (toInteger line)
-               <> pretty ":" <> pretty (toInteger col)
-               <+> pretty "do" <+> term
-    else
-      return $ pretty "__META" <+> pretty i
-               <> pretty ":" <> pretty (toInteger line)
-               <> pretty ":" <> pretty (toInteger col)
-               <+> pretty "in" <+> term
-
+    if isStmt
+      then
+        return $
+          pretty "__META" <+> pretty i
+            <> pretty ":"
+            <> pretty (toInteger line)
+            <> pretty ":"
+            <> pretty (toInteger col)
+            <+> pretty "do"
+            <+> term
+      else
+        return $
+          pretty "__META" <+> pretty i
+            <> pretty ":"
+            <> pretty (toInteger line)
+            <> pretty ":"
+            <> pretty (toInteger col)
+            <+> pretty "in"
+            <+> term
 
 runDoc :: State (M.Map String Int) (Doc a) -> Doc a
 runDoc m =
-    let (a, s) = runState m M.empty
-    in
-    vsep [ pretty "__SETMETA" <+> pretty i <+> pretty s  | (s, i) <-  M.toList s]
-    <+> hardline <+> a
+  let (a, s) = runState m M.empty
+   in vsep [pretty "__SETMETA" <+> pretty i <+> pretty (escape s) | (s, i) <- M.toList s]
+        <+> hardline
+        <+> a

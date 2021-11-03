@@ -100,7 +100,7 @@ finally n = loc $ case n of
         objLit $ map (decodeStringWithReplacement . fst &&& finally . snd) xs
 
     Function _ (Just fn) args body
-        | T.isPrefixOf "😘" fn -> func (Just $ mkName (T.tail fn)) (This : map mkName args) $ finally body
+        | T.isPrefixOf "😘" fn -> func (Just $ mkName (T.tail fn)) (map mkName args) $ finally body
         | otherwise -> func (Just $ mkName fn) (map mkName args) $ finally body
 
     Function _ Nothing args body ->

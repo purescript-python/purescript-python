@@ -94,12 +94,13 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) package =
                      mk . mkString . unComments $ coms
                | otherwise = mk "No document"
                where mk =  AST.StringLiteral Nothing
-    let foreignImport = AST.VariableIntroduction Nothing (unmangle "foreign") $
-                        Just $
-                          AST.App Nothing pyimport
-                            [ AST.StringLiteral Nothing $ mkString $ runForeignModuleName mn ]
+    -- we don't need any rts from dianascript, but a C# module extension
+    -- let foreignImport = AST.VariableIntroduction Nothing (unmangle "foreign") $
+    --                     Just $
+    --                       AST.App Nothing pyimport
+    --                         [ AST.StringLiteral Nothing $ mkString $ runForeignModuleName mn ]
     let hasForeign = not $ null foreigns
-    let foreign' = [foreignImport | hasForeign]
+    let foreign' = [] -- [foreignImport | hasForeign]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps

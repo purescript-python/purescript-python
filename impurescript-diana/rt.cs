@@ -88,6 +88,17 @@ namespace Impurescript
             return mod;
         }
 
+        public static List<DFunc> funcs = new List<DFunc>
+        {
+            MK.Func1("add", x => MK.Func1("add", y => x.__add__(y))),
+            MK.Func1("sub", x => MK.Func1("sub", y => x.__sub__(y))),
+            MK.Func1("idiv", x => MK.Func1("idiv", y => MK.Int(((DInt) x).value / ((DInt) y).value ))),
+            MK.Func1("fdiv", x => MK.Func1("fdiv", y => x.__truediv__(y))),
+            MK.Func1("mod", x => MK.Func1("mod", y => x.__mod__(y))),
+            MK.Func1("eq", x => MK.Func1("eq", y => MK.Int(x.__eq__(y)))),
+            MK.Func1("lt", x => MK.Func1("lt", y => MK.Int(x.__lt__(y)))),
+            MK.Func1("neg", x => x.__neg__()),
+        };
         void SetupNameSpace(DModule mod, string appPath)
         {
             mod.SetValue("new", MK.FuncN("new", js_new));
@@ -95,6 +106,12 @@ namespace Impurescript
             mod.SetValue("__path__", MK.String(appPath));
             mod.SetValue("module", mod);
             mod.SetValue("require", MK.Func1("require", x => Require(mod, (string)(DString)x)));
+
+            foreach(var func in funcs)
+            {
+                mod.SetValue("_" + func.name, func);
+            }
+            
         }
 
         string AbsRelativePath(string relativeToAbs, string absPath)
@@ -111,7 +128,6 @@ namespace Impurescript
             var absPath = AbsRelativePath(currentAbsPath, relPath);
             return absPath;
         }
-
         string getAppPath(string absPath)
         {
             return Path.GetRelativePath(ApplicationPath, absPath);

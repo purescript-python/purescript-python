@@ -47,7 +47,7 @@ class EvalJS repr where
     func    :: Maybe BoxedName -> [BoxedName] -> repr -> repr
     app     :: repr -> [repr] -> repr
     new     :: repr -> [repr] -> repr -- create class
-    block   :: [repr] -> repr
+    block   :: Bool -> [repr] -> repr
     var     :: BoxedName -> repr
 
     intro   :: BoxedName -> Maybe repr -> repr
@@ -77,6 +77,10 @@ recurIndex f ast =
             in (1 + j, inner')
 
 
+conciseBlock :: EvalJS repr => AST -> repr
+conciseBlock n = case n of
+    Block _ xs -> analyzeLoc n $ block False $ map finally xs
+    a -> finally a
 
 finally :: EvalJS repr => AST -> repr
 finally n = loc $ case n of
@@ -100,8 +104,8 @@ finally n = loc $ case n of
         objLit $ map (decodeStringWithReplacement . fst &&& finally . snd) xs
 
     Function _ (Just fn) args body
-        | T.isPrefixOf "😘" fn -> func (Just $ mkName (T.tail fn)) (map mkName args) $ finally body
-        | otherwise -> func (Just $ mkName fn) (map mkName args) $ finally body
+        | T.isPrefixOf "😘" fn -> func (Just $ mkName (T.tail fn)) (map mkName args) $ conciseBlock body
+        | otherwise -> func (Just $ mkName fn) (map mkName args) $ conciseBlock body
 
     Function _ Nothing args body ->
         func Nothing (map mkName args) $ finally body
@@ -128,7 +132,7 @@ finally n = loc $ case n of
     -- special names must in form of be `Var _` and not LHS
     Var _ n -> var (mkName n)
 
-    Block _ xs -> block $ map finally xs
+    Block _ xs -> block True $ map finally xs
 
     VariableIntroduction _ n Nothing ->
         intro (mkName n) Nothing
@@ -137,15 +141,16 @@ finally n = loc $ case n of
         intro (mkName n) $ Just (finally it)
 
     While _ cond body ->
-        while (finally cond) (finally body)
+
+        while (finally cond) (conciseBlock body)
 
     For _ n low high body -> -- this seems to be not allowed as well
-        forRange (mkName n) (finally low) (finally high) (finally body)
+        forRange (mkName n) (finally low) (finally high) (conciseBlock body)
 
     ForIn _ n itr body -> error "transformation for JavaScript forIn not allowed!"
 
     IfElse _ cond te fe ->
-        ite (finally cond) (finally te) (fmap finally fe)
+        ite (finally cond) (conciseBlock te) (fmap conciseBlock fe)
 
     Return _ e ->
         ret $ finally e
@@ -164,15 +169,18 @@ finally n = loc $ case n of
              BlockComment x -> x
         in comment (map f cs) (finally exp)
 
-    where loc | Just loc <- getSourceSpan n =
-                    let loc' = takeSourceLoc loc
-                    in  if line loc' == 0 then id
-                            -- This is actually invalid line number,
-                            -- and will break the support of Python 3.5.
-                        else
-                            located loc' (isStmt n)
-              | otherwise = id
+    where loc = analyzeLoc n
 
+
+analyzeLoc node
+    | Just loc <- getSourceSpan node =
+        let loc' = takeSourceLoc loc
+        in  if line loc' == 0 then id
+                -- This is actually invalid line number,
+                -- and will break the support of Python 3.5.
+            else
+                located loc' (isStmt node)
+    | otherwise = id
 takeSourceLoc
     SourceSpan
         { spanName=filename

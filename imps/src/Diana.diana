@@ -1,0 +1,10 @@
+exports.log = log
+exports.unit = None
+
+exports.getitem = subject -> fun (item)
+    subject[item]
+end
+
+exports.setitem = subject -> item -> fun (value)
+    subject[item] = value
+end

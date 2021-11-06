@@ -110,9 +110,13 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
     f <- f
     args <- sequence args
     return $ newObject <> tupled (f : args)
-  block suite = do
-    suite <- sequence suite
-    return $ indent 4 $ vsep suite
+  block useRealBlockExpr suite
+    | useRealBlockExpr = do
+      suite <- sequence suite
+      return $ vsep [pretty "begin", align $ vsep [indent 2 (vsep suite), pretty "end"]]
+    | otherwise = do
+      suite <- sequence suite
+      return $ indent 4 $ vsep suite
   var (Normal n) = return $ pretty n
   var This = return thisName
   var Import = return importName

@@ -1,20 +1,18 @@
-module Main where
+module Main(e) where
 
-import Prelude
-import Effect
+import Diana (unit, Unit, log)
 
-import Effect.Class
-import Effect.Console
 
-data Unit2 = Unit2
+e = unit
+discard :: Unit -> Unit
+discard _ = unit
 
-xxx :: Effect Int
-xxx = do
-    log "5"
-    pure $ 1 + 10
+ignore :: forall a. a -> Unit
+ignore _ = unit
 
-main :: Effect Unit
-main = do
-    log "🍝"
-    z <- xxx
-    log $ show (z * 3)
+main :: Unit
+main =
+    let _ = ignore (log "🍝") in
+    let z = 1 in
+    log z
+

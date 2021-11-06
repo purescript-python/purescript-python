@@ -96,12 +96,12 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
                | otherwise = mk "No document"
                where mk =  AST.StringLiteral Nothing
     
-    -- let foreignImport = AST.VariableIntroduction Nothing (unmangle "foreign") $
-    --                      Just $
-    --                        AST.App Nothing pyimport
-    --                          [ AST.StringLiteral Nothing $ mkString $ runForeignModulePath mn ]
+    let foreignImport = AST.VariableIntroduction Nothing (unmangle "foreign") $
+                         Just $
+                           AST.App Nothing pyimport
+                             [ AST.StringLiteral Nothing $ mkString $ runForeignModulePath mn ]
     let hasForeign = not $ null foreigns
-    let foreign' = [] -- [foreignImport | hasForeign]
+    let foreign' = [foreignImport | hasForeign]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
@@ -126,7 +126,7 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
     -- https://github.com/purescript/purescript/pull/3843/files
     T.intercalate sep  (prefix ++ [pns] ++ suffix)
 
-  -- runForeignModulePath = runModuleNameImpl (T.pack [pathSeparator]) [".."] ["@ffi.diana"]
+  runForeignModulePath = runModuleNameImpl (T.pack [pathSeparator]) [".."] ["@ffi.diana"]
   runModulePath        = runModuleNameImpl (T.pack [pathSeparator]) [".."] ["@main.diana"]
   runModuleName        = runModuleNameImpl "." [] []
 
@@ -298,10 +298,9 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
     unApp (App _ val arg) args = unApp val (arg : args)
     unApp other args = (other, args)
   valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
-      return $ foreignIdent ident
-    -- return $ if mn' == mn
-    --          then foreignIdent ident
-    --          else varToJs qi
+    return $ if mn' == mn
+             then foreignIdent ident
+             else varToJs qi
   valueToJs' (Var (_, _, _, Just IsForeign) ident) =
     internalError $ "Encountered an unqualified reference to a foreign ident " ++ T.unpack (showQualified showIdent ident)
   valueToJs' (Var _ ident) = return $ varToJs ident
@@ -380,8 +379,7 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToDiana (f a)
 
   foreignIdent :: Ident -> AST
-  foreignIdent ident = -- accessorString (mkString $ runIdent ident) (AST.Var Nothing $ unmangle "foreign")
-              AST.Var Nothing $ unmangle $ runIdent ident
+  foreignIdent ident = accessorString (mkString $ runIdent ident) (AST.Var Nothing $ unmangle "foreign")
 
   -- | Generate code in the simplified JavaScript intermediate representation for pattern match binders
   -- and guards.

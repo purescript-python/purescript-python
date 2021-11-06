@@ -41,6 +41,7 @@ passing/**.src.py
 *.tokens
 *.interp
 *.ran
+.spago
 
 # generated Python code
 codegen/*_raw.py

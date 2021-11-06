@@ -5,6 +5,6 @@
     <DefineConstants>NUNITY;CONSOLE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DianaScript\DianaScript.csproj" />
+    <ProjectReference Include="..\DianaScript-JIT\DianaScript.csproj" />
   </ItemGroup>
 </Project>

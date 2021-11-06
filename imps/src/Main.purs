@@ -3,7 +3,9 @@ module Main(e) where
 import Diana (unit, Unit, log)
 
 
+e :: Unit
 e = unit
+
 discard :: Unit -> Unit
 discard _ = unit
 

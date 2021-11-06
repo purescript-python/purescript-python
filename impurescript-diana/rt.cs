@@ -1,4 +1,4 @@
-using Ava;
+using Diana;
 using System;
 using System.IO;
 using System.Collections.Generic;
@@ -71,9 +71,8 @@ namespace Impurescript
             SetupNameSpace(mod, appPath);
 
             var ast = DianaScriptAPIs.Parse(path);
-            var code = DianaScriptAPIs.compileModule(ast, path);
-
-            VM.execute(code, globals);
+            var exec = DianaScriptAPIs.compileModule(ast, path);
+            exec(globals);
 
             var exports = globals.GetValue("exports");
 

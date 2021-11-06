@@ -1,0 +1,3 @@
+[submodule "DianaScript-JIT"]
+	path = DianaScript-JIT
+	url = ssh://git@github.com/thautwarm/DianaScript-JIT

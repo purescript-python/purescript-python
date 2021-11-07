@@ -29,7 +29,6 @@ namespace Impurescript
             return self.TryGetValue(v, out var o) ? o : DNone.unique;
         }
 
-
     }
 
 
@@ -37,6 +36,14 @@ namespace Impurescript
     public class Impurescript
     {
         public string ApplicationPath;
+
+        public Impurescript(string path = null)
+        {
+            ApplicationPath = path ?? Environment.CurrentDirectory;
+            ModuleCaches = new Dictionary<string, DModule>();
+            main_calls = new List<Action>();
+        }
+        static List<Action> main_calls;
 
         public Dictionary<string, DModule> ModuleCaches;
 
@@ -50,13 +57,14 @@ namespace Impurescript
             return l.__floordiv__(r);
         }
 
+        static InternString tag = "tag".toIntern();
         static DObj js_new(DObj[] args)
         {
             if(args.Length < 1)
                 throw new ArgumentException("cannot new with zero arguments.");
             var f = args[0];
             var obj = new Dictionary<DObj, DObj>();
-            obj[MK.Int(0)] = f;
+            obj[tag] = f;
             args[0] = MK.Dict(obj);
             return f.__call__(args);
         }
@@ -74,6 +82,13 @@ namespace Impurescript
             var exec = DianaScriptAPIs.compileModule(ast, path);
             exec(globals);
 
+            var main = globals.GetValue("x_main");
+            if (main is DStaticFunc f)
+            {
+                
+                main_calls.Add(() => f.__call__(DNone.unique));
+            }
+
             var exports = globals.GetValue("exports");
 
             mod.fields = exported;
@@ -89,14 +104,8 @@ namespace Impurescript
 
         public static List<DFunc> funcs = new List<DFunc>
         {
-            MK.Func1("add", x => MK.Func1("add", y => x.__add__(y))),
-            MK.Func1("sub", x => MK.Func1("sub", y => x.__sub__(y))),
             MK.Func1("idiv", x => MK.Func1("idiv", y => MK.Int(((DInt) x).value / ((DInt) y).value ))),
             MK.Func1("fdiv", x => MK.Func1("fdiv", y => x.__truediv__(y))),
-            MK.Func1("mod", x => MK.Func1("mod", y => x.__mod__(y))),
-            MK.Func1("eq", x => MK.Func1("eq", y => MK.Int(x.__eq__(y)))),
-            MK.Func1("lt", x => MK.Func1("lt", y => MK.Int(x.__lt__(y)))),
-            MK.Func1("neg", x => x.__neg__()),
         };
         void SetupNameSpace(DModule mod, string appPath)
         {
@@ -153,17 +162,13 @@ namespace Impurescript
             return ExecutePathWithNewModule(absPath);
         }
 
-        public Impurescript(string path = null)
-        {
-            ApplicationPath = path ?? Environment.CurrentDirectory;
-            ModuleCaches = new Dictionary<string, DModule>();
-        }
 
 #if CONSOLE
         public static void Main(string[] args)
         {
             var imps = new Impurescript();
             args.ToList().ForEach(imps.ExecutePath);
+            main_calls.ForEach(runmain => runmain());
         }
 #endif
     }

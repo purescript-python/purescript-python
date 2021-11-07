@@ -23,7 +23,6 @@ import Control.Monad.State
 import Control.Applicative
 import Control.Arrow ((&&&))
 
-
 pattern Attr ps <- ArrayLiteral _ [StringLiteral _ ps]
 
 class EvalJS repr where
@@ -79,6 +78,7 @@ recurIndex f ast =
 
 conciseBlock :: EvalJS repr => AST -> repr
 conciseBlock n = case n of
+    Block _ [Block _ xs] -> analyzeLoc n $ block False $ map finally xs
     Block _ xs -> analyzeLoc n $ block False $ map finally xs
     a -> finally a
 

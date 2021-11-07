@@ -289,6 +289,10 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
     case f of
+      Var (s, _, _, _) (Qualified (Just (ModuleName "Diana")) (Ident "and")) | length args == 2 ->
+          return $ AST.Binary (Just s) AST.And (head args') (args'!!1)
+      Var (s, _, _, _) (Qualified (Just (ModuleName "Diana")) (Ident "or")) | length args == 2 ->
+          return $ AST.Binary (Just s) AST.Or (head args') (args'!!1)
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'

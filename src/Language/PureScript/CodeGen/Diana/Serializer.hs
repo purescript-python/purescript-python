@@ -55,7 +55,6 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
       New -> error "fatal"
 
   binary op l r = do
-    -- actually this will not be called in ImPureScript
     l <- l
     r <- r
     return $ case op of
@@ -70,8 +69,8 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
       LessThanOrEqualTo -> l <+> pretty "<=" <+> r
       GreaterThan -> l <+> pretty ">" <+> r
       GreaterThanOrEqualTo -> l <+> pretty ">=" <+> r
-      And -> l <+> pretty "and" <+> r
-      Or -> l <+> pretty "or" <+> r
+      And -> pretty "(" <> l <+> softline <> pretty "and" <+> r <> pretty ")"
+      Or -> pretty "(" <> l <+> softline <> pretty "or" <+> r <> pretty ")"
       BitwiseAnd -> l <+> pretty "&" <+> r
       BitwiseOr -> l <+> pretty "|" <+> r
       BitwiseXor -> l <+> pretty "^" <+> r
@@ -167,7 +166,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
   isa inst ty = do
     inst <- inst
     ty <- ty
-    return $ inst <> pretty "[0]" <> pretty "==" <> ty
+    return $ inst <> pretty "[:tag]" <> pretty "==" <> ty
   comment cs exp = exp
 
   located SourceLoc {line, col, filename} isStmt term = do

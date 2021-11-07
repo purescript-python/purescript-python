@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+SCRIPT_PARENT=${0%/*}
+dotnet run --project "${SCRIPT_PARENT}/impurescript-diana.csproj" "$@" --no-build

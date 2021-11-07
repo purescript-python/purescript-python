@@ -13,7 +13,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
 import qualified Data.Text as T
-import Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc hiding (tupled, encloseSep)
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.Diana.Common
 import Language.PureScript.CodeGen.Diana.Eval
@@ -29,6 +29,16 @@ optional Nothing = pretty "None"
 
 pattern Optional a <- (optional -> a)
 
+
+encloseSep l r sep xs =
+    l <+> encloseSepImpl sep xs <+> r
+    where
+        encloseSepImpl sep [] = emptyDoc 
+        encloseSepImpl sep [x] = x
+        encloseSepImpl sep (x:xs) = x <+> sep <> softline <+> encloseSepImpl sep xs
+  
+tupled = encloseSep (pretty "(") (pretty ")") comma
+
 instance EvalJS (State (M.Map String Int) (Doc a)) where
   none = return $ pretty "None"
   intLit i = return $ pretty i
@@ -40,7 +50,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
           o <- o
           return (pretty (escape field) <> pretty ":" <+> o)
     xs <- mapM meach xs
-    return $ align (encloseSep (pretty "{") (pretty "}") comma xs)
+    return $ encloseSep (pretty "{") (pretty "}") comma xs
 
   arrayLit xs = do
     xs <- sequence xs
@@ -99,7 +109,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
     let n = case n' of
           Nothing -> T.pack ""
           Just (MustNorm n) -> n
-    return $ vsep [pretty "fun" <+> pretty n <> tupled (map (pretty . forceNorm) args), align $ vsep [body, pretty "end"]]
+    return $ vsep [pretty "fun" <+> pretty n <> tupled (map (pretty . forceNorm) args),  indent 4 body, pretty "end"]
 
   app f args = do
     f <- f
@@ -112,7 +122,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
   block useRealBlockExpr suite
     | useRealBlockExpr = do
       suite <- sequence suite
-      return $ vsep [pretty "begin", align $ vsep [indent 2 (vsep suite), pretty "end"]]
+      return $ vsep [pretty "begin",  indent 2 (vsep suite), pretty "end"]
     | otherwise = do
       suite <- sequence suite
       return $ indent 4 $ vsep suite
@@ -132,11 +142,8 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
     return $
       vsep
         [ pretty "while" <+> cond <+> pretty "do",
-          align $
-            vsep
-              [ body,
-                pretty "end"
-              ]
+            indent 4 body,
+            pretty "end"
         ]
   forRange (MustNorm n) low high body = do
     low <- low
@@ -145,17 +152,18 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
     return $
       vsep
         [ pretty "for" <+> pretty "n" <+> pretty "in" <+> ranger <> tupled [low, high] <+> pretty "do",
-          align $ vsep [body, pretty "end"]
+          indent 4 body,
+          pretty "end"
         ]
   ite cond te Nothing = do
     cond <- cond
     te <- te
-    return $ vsep [pretty "if" <+> cond <+> pretty "then", align $ vsep [te, pretty "end"]]
+    return $ vsep [pretty "if" <+> cond <+> pretty "then", indent 4 te, pretty "end"]
   ite cond te (Just fe) = do
     cond <- cond
     te <- te
     fe <- fe
-    return $ vsep [pretty "if" <+> cond <+> pretty "then", align $ vsep [te, pretty "else", indent (-4) fe, pretty "end"]]
+    return $ vsep [pretty "if" <+> cond <+> pretty "then", indent 4 te, pretty "else", fe, pretty "end"]
   ret v = do
     v <- v
     return $ pretty "return" <+> v
@@ -191,6 +199,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
             <+> term
       else
         return $
+          pretty "(" <>
           pretty "__META" <+> pretty i
             <> pretty ":"
             <> pretty (toInteger line)
@@ -198,6 +207,7 @@ instance EvalJS (State (M.Map String Int) (Doc a)) where
             <> pretty (toInteger col)
             <+> pretty "in"
             <+> term
+            <> pretty ")" 
 
 runDoc :: State (M.Map String Int) (Doc a) -> Doc a
 runDoc m =

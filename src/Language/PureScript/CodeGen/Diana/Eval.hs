@@ -78,7 +78,7 @@ recurIndex f ast =
 
 conciseBlock :: EvalJS repr => AST -> repr
 conciseBlock n = case n of
-    Block _ [Block _ xs] -> analyzeLoc n $ block False $ map finally xs
+    Block _ [x] -> analyzeLoc n $ conciseBlock x
     Block _ xs -> analyzeLoc n $ block False $ map finally xs
     a -> finally a
 
@@ -108,7 +108,7 @@ finally n = loc $ case n of
         | otherwise -> func (Just $ mkName fn) (map mkName args) $ conciseBlock body
 
     Function _ Nothing args body ->
-        func Nothing (map mkName args) $ finally body
+        func Nothing (map mkName args) $ conciseBlock body
 
     Indexer _ (Attr ps) base ->
         getAttr (finally base) (decodeStringWithReplacement ps)
@@ -132,6 +132,7 @@ finally n = loc $ case n of
     -- special names must in form of be `Var _` and not LHS
     Var _ n -> var (mkName n)
 
+    Block _ [x] -> finally x
     Block _ xs -> block True $ map finally xs
 
     VariableIntroduction _ n Nothing ->
@@ -204,5 +205,4 @@ isStmt a = case a of
     For {} -> True
     VariableIntroduction {} -> True
     Assignment {} -> True
-    Block _ _ -> True
     _ -> False

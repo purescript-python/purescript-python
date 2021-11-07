@@ -282,21 +282,22 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
   valueToJs' (Abs _ arg val) = do
     ret <- valueToJs val
     let jsArg = case arg of
-                  UnusedIdent -> []
-                  _           -> [identToDiana arg]
+                  UnusedIdent       -> []
+                  Ident "$__unused" -> []
+                  _                 -> [identToDiana arg]
     return $ AST.Function Nothing Nothing jsArg (AST.Block Nothing [AST.Return Nothing ret])
-  valueToJs' e@App{} = do
+  valueToJs' e@(App (s, _, _, _) _ _) = do
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
     case f of
-      Var (s, _, _, _) (Qualified (Just (ModuleName "Diana")) (Ident "and")) | length args == 2 ->
+      Var (_, _, _, _) (Qualified (Just (ModuleName "Diana")) (Ident "and")) | length args == 2 ->
           return $ AST.Binary (Just s) AST.And (head args') (args'!!1)
-      Var (s, _, _, _) (Qualified (Just (ModuleName "Diana")) (Ident "or")) | length args == 2 ->
+      Var (_, _, _, _) (Qualified (Just (ModuleName "Diana")) (Ident "or")) | length args == 2 ->
           return $ AST.Binary (Just s) AST.Or (head args') (args'!!1)
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-        return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
-      _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
+        return $ AST.Unary (Just s) AST.New $ AST.App (Just s) (qualifiedToJS id name) args'
+      _ -> flip (foldl (\fn a -> AST.App (Just s) fn [a])) args' <$> valueToJs f
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
     unApp (App _ val arg) args = unApp val (arg : args)
@@ -406,12 +407,10 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
 
       failedPatternError :: [Text] -> AST
       failedPatternError names =
-        let joinStr = accessorString "join" (AST.StringLiteral Nothing "str")
-        in AST.App Nothing (AST.Var Nothing $ unmangle "Error")
-            [ AST.Binary Nothing AST.Add
+        let joinStr = accessorString "join" (AST.Var Nothing $ unmangle "Str")
+        in AST.Binary Nothing AST.Add
                 (AST.StringLiteral Nothing $ mkString failedPatternMessage) $
                   AST.App Nothing joinStr [AST.StringLiteral Nothing ",", AST.ArrayLiteral Nothing $ zipWith valueError names vals]
-            ]
 
       failedPatternMessage :: Text
       failedPatternMessage = "Failed pattern match at " <> runModuleName mn <> " " <> displayStartEndPos ss <> ": "
@@ -422,7 +421,7 @@ moduleToJS (Module _ coms mn _ imps exps reExps foreigns decls) _ =
       valueError _ l@(AST.BooleanLiteral _ _) = l
       -- Newing an object produces such a Python programs
       --  `new A(b, c) -> tmp = {".t" : A}; A(b, c, this=tmp); return tmp
-      valueError s _                          = indexerString "class" $ AST.Var Nothing s
+      valueError s _                          = AST.Indexer Nothing (AST.Var Nothing $ unmangle ":tag") $ AST.Var Nothing s
 
       guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [AST]
       guardsToJs (Left gs) = traverse genGuard gs where

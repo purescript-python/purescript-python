@@ -35,7 +35,20 @@ namespace Impurescript
     [Serializable]
     public class Impurescript
     {
+
+#if CONSOLE
+        public static void Main(string[] args)
+        {
+            var imps = new Impurescript();
+            args.ToList().ForEach(imps.LoadFromPath);
+            main_calls.ForEach(runmain => runmain());
+            main_calls.Clear();
+        }
+#endif
+
         public string ApplicationPath;
+        static List<Action> main_calls;
+        public Dictionary<string, DModule> ModuleCaches;
 
         public Impurescript(string path = null)
         {
@@ -43,9 +56,14 @@ namespace Impurescript
             ModuleCaches = new Dictionary<string, DModule>();
             main_calls = new List<Action>();
         }
-        static List<Action> main_calls;
+        
 
-        public Dictionary<string, DModule> ModuleCaches;
+        public void Exec(string path)
+        {
+            LoadFromPath(path);
+            main_calls.ForEach(runmain => runmain());
+            main_calls.Clear();
+        }
 
         static DObj poly_div(DObj l, DObj r)
         {
@@ -60,7 +78,7 @@ namespace Impurescript
         static InternString tag = "tag".toIntern();
         static DObj js_new(DObj[] args)
         {
-            if(args.Length < 1)
+            if (args.Length < 1)
                 throw new ArgumentException("cannot new with zero arguments.");
             var f = args[0];
             var obj = new Dictionary<DObj, DObj>();
@@ -85,7 +103,7 @@ namespace Impurescript
             var main = globals.GetValue("x_main");
             if (main is DStaticFunc f)
             {
-                
+
                 main_calls.Add(() => f.__call__(DNone.unique));
             }
 
@@ -115,11 +133,11 @@ namespace Impurescript
             mod.SetValue("module", mod);
             mod.SetValue("require", MK.Func1("require", x => Require(mod, (string)(DString)x)));
 
-            foreach(var func in funcs)
+            foreach (var func in funcs)
             {
                 mod.SetValue("_" + func.name, func);
             }
-            
+
         }
 
         string AbsRelativePath(string relativeToAbs, string absPath)
@@ -150,7 +168,7 @@ namespace Impurescript
             return ExecFromPath(appPath, absPath);
         }
 
-        public void ExecutePath(string relPath)
+        public void LoadFromPath(string relPath)
         {
             var absPath = Path.GetFullPath(relPath);
             ExecutePathWithNewModule(absPath);
@@ -161,15 +179,5 @@ namespace Impurescript
             var absPath = resolveAbsPathFromCurrent(oldEngine, relPath);
             return ExecutePathWithNewModule(absPath);
         }
-
-
-#if CONSOLE
-        public static void Main(string[] args)
-        {
-            var imps = new Impurescript();
-            args.ToList().ForEach(imps.ExecutePath);
-            main_calls.ForEach(runmain => runmain());
-        }
-#endif
     }
 }

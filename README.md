@@ -13,10 +13,10 @@
     If you're already a user of CPython, you can skip this step.
     
     Otherwise, go to [this official download](https://www.python.org/downloads/) page,
-    download and install any valid distribution(`>=3.5`).
+    download and install any valid distribution(`>=3.5`, **<=3.8**).
 
 
-1. Install [nodejs](https://nodejs.org/en/), which is distributed with a command `npm`, and use `npm` to install `purescript` and its package manager `spago`:
+1. Install [nodejs](https://nodejs.org/en/), which is distributed with a command `npm`, and use `npm` to install `purescript` and its package manager `spago`. The latest version of the purescript compiler that is supported is **0.13.8**:
    ```bash
    npm install -g purescript
    npm install -g spago
